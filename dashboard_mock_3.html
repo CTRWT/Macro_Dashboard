@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gold Regime — Macro Dashboard</title>
+
+<!-- Fraunces (display serif, 70s revival) + Geist (body) + DSEG7 (LCD) + JetBrains Mono (mono) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- DSEG7 (LCD-style segmented) hosted via cdn -->
+<link href="https://cdn.jsdelivr.net/npm/dseg@0.46.0/css/dseg.css" rel="stylesheet">
+
+<style>
+/* ============================================================
+   Tranquility Base × Casio
+   Dark warm by default, "daytime lobby" via prefers-color-scheme
+   ============================================================ */
+:root {
+  /* Base — late-night lounge, lifted slightly for readability */
+  --bg:           #2a2520;
+  --bg-panel:     #322b25;
+  --bg-panel-2:   #3a322a;
+  --bg-rule:      #4a3d33;
+
+  /* Ink — brighter for better contrast */
+  --text:         #f0e6d0;
+  --text-dim:     #b5a78d;
+  --text-faint:   #8a7c66;
+
+  /* Brass/burgundy/teal accents */
+  --brass:        #c9a472;
+  --brass-bright: #e0bc88;
+  --burgundy:     #a04540;
+  --burgundy-dim: #6a2a26;
+  --teal:         #7aaaad;
+  --teal-dim:     #3a5b5d;
+  --rust:         #d4774e;
+  --ochre:        #d4a955;
+  --cream:        #f0e6d0;
+
+  /* LCD panel — warm amber/sepia, clock-radio feel */
+  --lcd-bg:       #3a322a;
+  --lcd-bg-rim:   #201913;
+  --lcd-fg:       #e8c89a;
+  --lcd-fg-dim:   rgba(232, 200, 154, 0.18);
+
+  /* Scenario semantics */
+  --scen-1:       var(--rust);      /* inflation */
+  --scen-2:       var(--teal);      /* productivity */
+  --scen-3:       var(--burgundy);  /* tail risk */
+
+  /* Chart palette — brighter, more contrast against panel bg */
+  --chart-strat:  #e8dcc4;
+  --chart-gold:   #d4a955;
+  --chart-ind:    #8ec0c2;
+  --drv-ry:       #e08a5a;
+  --drv-dxy:      #8caebd;
+  --drv-cpi:      #c898be;
+  --drv-gs:       #a8c080;
+  --drv-nfci:     #d47878;
+  --thr:          rgba(201, 164, 114, 0.55);
+  --band-long:    rgba(122, 170, 173, 0.18);
+  --band-cash:    rgba(160, 69, 64, 0.20);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Daytime lobby — sun through dusty curtains */
+    --bg:         #ebe2ce;
+    --bg-panel:   #e0d6bf;
+    --bg-panel-2: #d6cab1;
+    --bg-rule:    #b8a888;
+
+    --text:       #2a1f17;
+    --text-dim:   #5a4a38;
+    --text-faint: #8a7a60;
+
+    --brass:        #8a6a32;
+    --brass-bright: #a88240;
+    --burgundy:     #6a2520;
+    --burgundy-dim: #4a1a16;
+    --teal:         #3a5b5d;
+    --teal-dim:     #2a4344;
+    --rust:         #8a4528;
+    --cream:        #2a1f17;
+
+    --lcd-bg:       #d4c8a8;
+    --lcd-bg-rim:   #a89878;
+    --lcd-fg:       #3a2a18;
+    --lcd-fg-dim:   rgba(58, 42, 24, 0.15);
+
+    --chart-strat:  #3a3025;
+    --chart-gold:   #8a6a32;
+    --chart-ind:    #3a5b5d;
+    --drv-ry:       #8a4528;
+    --drv-dxy:      #4a6878;
+    --drv-cpi:      #6a4858;
+    --drv-gs:       #5a7040;
+    --drv-nfci:     #6a2520;
+    --thr:          rgba(138, 106, 50, 0.55);
+    --band-long:    rgba(58, 91, 93, 0.18);
+    --band-cash:    rgba(106, 37, 32, 0.20);
+  }
+}
+
+/* ============================================================
+   Reset & paper grain
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Geist", -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Faint paper grain — matches both modes */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/></filter><rect width='200' height='200' filter='url(%23n)' opacity='1'/></svg>");
+  mix-blend-mode: overlay;
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.shell {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 28px 32px 80px;
+  position: relative; z-index: 2;
+}
+
+/* ---- Masthead ---- */
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--bg-rule);
+  padding-bottom: 24px;
+  margin-bottom: 8px;
+}
+.masthead-title {
+  font-family: "Fraunces", serif;
+  font-variation-settings: "SOFT" 100, "opsz" 144;
+  font-weight: 500;
+  font-size: 44px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text);
+}
+.masthead-title em {
+  font-style: italic;
+  color: var(--brass-bright);
+  font-weight: 400;
+}
+.masthead-sub {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  letter-spacing: 0.02em;
+}
+.masthead-meta {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.masthead-meta .stamp {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid var(--brass);
+  color: var(--brass);
+  margin-bottom: 6px;
+}
+
+/* ---- Tab nav: brass directory bar ---- */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--brass);
+  margin: 24px 0 28px;
+  position: sticky; top: 0;
+  background: var(--bg);
+  z-index: 5;
+  padding-top: 6px;
+}
+.tab {
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 12px 22px 14px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  position: relative;
+  border-right: 1px solid var(--bg-rule);
+  transition: color 180ms ease;
+}
+.tab:first-child { border-left: 1px solid var(--bg-rule); }
+.tab .num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+.tab .name {
+  font-family: "Fraunces", serif;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--brass-bright); }
+.tab.active .num { color: var(--brass); }
+.tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px; left: 0; right: 0; height: 2px;
+  background: var(--brass-bright);
+}
+
+/* ---- Section primitives ---- */
+.section {
+  margin-bottom: 32px;
+}
+.section-rule {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 18px;
+  padding-top: 8px;
+}
+.section-rule .marker {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--brass);
+  text-transform: uppercase;
+}
+.section-rule h2 {
+  font-family: "Fraunces", serif;
+  font-weight: 500;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.section-rule .line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--brass) 0%, transparent 100%);
+}
+.section-blurb {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 18px;
+  max-width: 720px;
+  line-height: 1.55;
+}
+
+/* ---- LCD readout panel (the Casio half) ---- */
+.lcd-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.lcd {
+  background: var(--lcd-bg);
+  border: 1px solid var(--lcd-bg-rim);
+  border-radius: 4px;
+  padding: 14px 16px 16px;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.04),
+    inset 0 -2px 6px rgba(0,0,0,0.18),
+    0 1px 0 rgba(255,255,255,0.03);
+}
+.lcd::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.04) 0px,
+    rgba(0,0,0,0.04) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  opacity: 0.6;
+}
+.lcd-label {
+  font-family: "Geist", sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--lcd-fg);
+  opacity: 0.7;
+  margin-bottom: 4px;
+  position: relative; z-index: 1;
+}
+.lcd-value {
+  font-family: "DSEG7-Classic", "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 28px;
+  color: var(--lcd-fg);
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  position: relative; z-index: 1;
+  /* "ghost" 8s behind the active digits, classic LCD look */
+  text-shadow: none;
+}
+.lcd-sub {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--lcd-fg);
+  opacity: 0.85;
+  margin-top: 6px;
+  letter-spacing: 0.05em;
+  position: relative; z-index: 1;
+}
+.lcd-sub .delta-pos { color: var(--lcd-fg); }
+.lcd-sub .delta-neg { color: var(--lcd-fg); }
+
+/* Status flag pill — replaces prose interpretation, computed from threshold rules */
+.lcd-flag {
+  display: inline-block;
+  padding: 2px 8px 3px;
+  margin-top: 8px;
+  border-radius: 2px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+  position: relative; z-index: 1;
+  border-left: 2px solid;
+}
+.lcd-flag.calm     { background: rgba(232, 200, 154, 0.10); color: #d4b88a; border-left-color: #b09870; }
+.lcd-flag.moderate { background: rgba(212, 169, 85, 0.18);  color: #f0c878; border-left-color: var(--ochre); }
+.lcd-flag.stressed { background: rgba(212, 119, 78, 0.20);  color: #f0a880; border-left-color: var(--rust); }
+
+@media (prefers-color-scheme: light) {
+  .lcd-flag.calm     { background: rgba(138, 106, 50, 0.10); color: #5a4828; }
+  .lcd-flag.moderate { background: rgba(160, 120, 50, 0.18); color: #5a3818; }
+  .lcd-flag.stressed { background: rgba(138, 69, 40, 0.18);  color: #4a2818; }
+}
+
+/* "ghost digits" under value to mimic LCD off-segments */
+.lcd-value-wrap {
+  position: relative; z-index: 1;
+  font-family: "DSEG7-Classic", "JetBrains Mono", monospace;
+}
+.lcd-value-wrap .ghost {
+  position: absolute; inset: 0;
+  color: var(--lcd-fg-dim);
+  z-index: 0;
+}
+
+/* ---- Data card (non-LCD, for tables/notes) ---- */
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-rule);
+  border-radius: 3px;
+  padding: 18px 20px;
+}
+.card-head {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card-head .small {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+/* ---- Chart container ---- */
+.chart-wrap {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-rule);
+  border-radius: 3px;
+  padding: 18px 20px 14px;
+  margin-bottom: 16px;
+}
+.chart-title {
+  font-family: "Fraunces", serif;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.chart-sub {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.legend {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.legend span { display: flex; align-items: center; gap: 6px; }
+.swatch { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+.swatch.thr { height: 0; border-top: 1.4px dotted var(--thr); }
+.swatch.box { height: 10px; border-radius: 1px; opacity: 0.6; }
+
+.chart-host {
+  position: relative;
+  height: 320px;
+}
+.chart-host.tall { height: 420px; }
+.chart-host.short { height: 200px; }
+
+/* How-to-read note appended below charts */
+.how-to-read {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: rgba(201, 164, 114, 0.06);
+  border-left: 2px solid var(--brass);
+  border-radius: 0 3px 3px 0;
+  font-family: "Geist", sans-serif;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.how-to-read strong {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass-bright);
+  display: inline-block;
+  margin-right: 8px;
+  font-weight: 500;
+}
+.how-to-read em {
+  color: var(--text);
+  font-style: italic;
+}
+
+/* ---- Driver mini-grid ---- */
+.driver-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.driver-grid .chart-wrap { margin-bottom: 0; }
+.driver-grid .full { grid-column: 1 / -1; }
+@media (max-width: 800px) { .driver-grid { grid-template-columns: 1fr; } }
+
+/* ---- Latest readings table ---- */
+table.readings {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.readings th {
+  text-align: left;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bg-rule);
+}
+table.readings td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--bg-rule);
+  color: var(--text);
+}
+table.readings tr:last-child td { border-bottom: none; }
+table.readings .num {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text);
+}
+table.readings .tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 2px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 500;
+  border-left: 2px solid;
+}
+.tag.bull   { background: rgba(122, 170, 173, 0.18); color: #b8e0e2; border-left-color: var(--teal); }
+.tag.bear   { background: rgba(160, 69, 64, 0.20);   color: #f0a8a4; border-left-color: var(--burgundy); }
+.tag.neutral{ background: rgba(201, 164, 114, 0.10); color: var(--text-dim); border-left-color: var(--text-faint); }
+
+@media (prefers-color-scheme: light) {
+  .tag.bull    { background: rgba(58, 91, 93, 0.18);  color: #1f3536; }
+  .tag.bear    { background: rgba(106, 37, 32, 0.20); color: #4a1a16; }
+  .tag.neutral { background: rgba(138, 106, 50, 0.12); color: #5a4a38; }
+}
+
+/* ---- Controls ---- */
+.controls {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  margin: 16px 0 22px;
+  text-transform: uppercase;
+}
+.controls label { display: flex; align-items: center; gap: 6px; }
+.controls select, .controls button {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 5px 10px;
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--bg-rule);
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.controls select:hover, .controls button:hover {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+.controls button.preset { padding: 4px 10px; }
+
+/* ---- Scenario tracker ---- */
+.scen-banner {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--bg-rule);
+  border-left: 3px solid var(--brass);
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px;
+}
+.scen-banner .lbl {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.scen-banner .name {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 24px;
+  color: var(--text);
+}
+.scen-banner .name .lead { color: var(--brass-bright); }
+.scen-banner .pct {
+  font-family: "DSEG7-Classic", "JetBrains Mono", monospace;
+  font-size: 32px;
+  color: var(--brass-bright);
+  letter-spacing: 0.02em;
+}
+
+.scen-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 26px;
+}
+@media (max-width: 800px) { .scen-grid { grid-template-columns: 1fr; } }
+.scen-card {
+  border: 1px solid var(--bg-rule);
+  border-top: 3px solid var(--scen-1);
+  background: var(--bg-panel);
+  padding: 18px 20px;
+  position: relative;
+}
+.scen-card.s2 { border-top-color: var(--scen-2); }
+.scen-card.s3 { border-top-color: var(--scen-3); }
+.scen-card .num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.scen-card h3 {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 10px;
+  line-height: 1.2;
+}
+.scen-card .desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+.scen-card .prob-bar {
+  height: 6px;
+  background: var(--bg-rule);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.scen-card .prob-fill {
+  height: 100%;
+  background: var(--scen-1);
+  transition: width 400ms ease;
+}
+.scen-card.s2 .prob-fill { background: var(--scen-2); }
+.scen-card.s3 .prob-fill { background: var(--scen-3); }
+.scen-card .prob-pct {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text);
+  display: flex; justify-content: space-between;
+}
+.scen-card .prob-pct .small {
+  color: var(--text-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ---- Trigger watchlist ---- */
+.trigger-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  border-top: 1px solid var(--bg-rule);
+}
+.trigger-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 110px;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--bg-rule);
+  align-items: center;
+  font-size: 13px;
+}
+.trigger-row .what {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  color: var(--brass-bright);
+  letter-spacing: 0.03em;
+  font-weight: 500;
+}
+.trigger-row .desc {
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.trigger-row .scen {
+  text-align: right;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 2px;
+  display: inline-block;
+  justify-self: end;
+  border-left: 2px solid;
+}
+.trigger-row .s1 {
+  color: var(--rust);
+  background: rgba(212, 119, 78, 0.12);
+  border-left-color: var(--rust);
+}
+.trigger-row .s2 {
+  color: var(--teal);
+  background: rgba(122, 170, 173, 0.12);
+  border-left-color: var(--teal);
+}
+.trigger-row .s3 {
+  color: #d4807c;
+  background: rgba(160, 69, 64, 0.18);
+  border-left-color: var(--burgundy);
+}
+@media (prefers-color-scheme: light) {
+  .trigger-row .s1 { color: #6a3018; background: rgba(138, 69, 40, 0.15); }
+  .trigger-row .s2 { color: #2a4344; background: rgba(58, 91, 93, 0.15); }
+  .trigger-row .s3 { color: #4a1a16; background: rgba(106, 37, 32, 0.18); }
+}
+
+/* ---- About / methodology ---- */
+.about-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 800px) { .about-grid { grid-template-columns: 1fr; } }
+.about-grid .card { padding: 22px 24px; }
+.about-grid p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.about-grid p strong {
+  color: var(--text);
+  font-weight: 500;
+}
+.about-grid h3 {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+/* ---- Footer ---- */
+.footer {
+  margin-top: 60px;
+  padding-top: 18px;
+  border-top: 1px solid var(--bg-rule);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.footer .crest {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--brass);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---- Tab visibility ---- */
+.tab-panel { display: none; animation: fade-in 280ms ease; }
+.tab-panel.active { display: block; }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* DSEG fallback fix — if font fails, JetBrains Mono is acceptable */
+@font-face {
+  font-family: "DSEG7-Classic";
+  font-display: swap;
+}
+</style>
+</head>
+
+<body>
+
+<div class="shell">
+
+<!-- ============================================================
+     MASTHEAD
+     ============================================================ -->
+<header class="masthead">
+  <div>
+    <h1 class="masthead-title">Gold <em>Regime</em></h1>
+    <div class="masthead-sub">A 5-driver macro indicator &amp; debasement-thesis observatory</div>
+  </div>
+  <div class="masthead-meta">
+    <div class="stamp">No. 26 · MAR 2026</div>
+    <div>Last refresh · 2026-03-31 18:42 SGT</div>
+    <div style="margin-top: 2px; opacity: 0.6;">v1.0 · Methodology rev. May 2026</div>
+  </div>
+</header>
+
+<!-- ============================================================
+     TAB NAV
+     ============================================================ -->
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="t1" role="tab">
+    <span class="num">01</span><span class="name">Gold Regime</span>
+  </button>
+  <button class="tab" data-tab="t2" role="tab">
+    <span class="num">02</span><span class="name">Macro Dashboard</span>
+  </button>
+  <button class="tab" data-tab="t3" role="tab">
+    <span class="num">03</span><span class="name">Scenario Tracker</span>
+  </button>
+  <button class="tab" data-tab="t4" role="tab">
+    <span class="num">04</span><span class="name">About</span>
+  </button>
+</nav>
+
+
+<!-- ============================================================
+     TAB 1 — GOLD REGIME (preserved from existing dashboard)
+     ============================================================ -->
+<div id="t1" class="tab-panel active">
+
+  <!-- LCD hero metrics -->
+  <div class="lcd-row">
+    <div class="lcd">
+      <div class="lcd-label">Strategy · Final $1 →</div>
+      <div class="lcd-value-wrap">
+        <span class="ghost">88888</span>
+        <span class="lcd-value" id="lcd-strat">$76.42</span>
+      </div>
+      <div class="lcd-sub">CAGR <span class="delta-pos">+8.67%</span> · Sharpe 0.51 · DD <span class="delta-neg">−36.9%</span></div>
+    </div>
+    <div class="lcd">
+      <div class="lcd-label">Gold buy &amp; hold</div>
+      <div class="lcd-value-wrap">
+        <span class="ghost">88888</span>
+        <span class="lcd-value" id="lcd-gold">$35.15</span>
+      </div>
+      <div class="lcd-sub">CAGR <span class="delta-pos">+7.06%</span> · Sharpe 0.37 · DD <span class="delta-neg">−63.7%</span></div>
+    </div>
+    <div class="lcd">
+      <div class="lcd-label">Period · Backtest</div>
+      <div class="lcd-value-wrap">
+        <span class="ghost">88.8</span>
+        <span class="lcd-value" id="lcd-period">52.2</span>
+      </div>
+      <div class="lcd-sub">Years · Jan 1974 → Mar 2026</div>
+    </div>
+  </div>
+
+  <!-- Period controls -->
+  <div class="controls">
+    <label>From <select id="startSel"></select></label>
+    <label>To <select id="endSel"></select></label>
+    <span style="color: var(--text-faint);">·</span>
+    <span>Presets</span>
+    <button class="preset" onclick="setPreset('all')">All</button>
+    <button class="preset" onclick="setPreset(35)">35Y</button>
+    <button class="preset" onclick="setPreset(20)">20Y</button>
+    <button class="preset" onclick="setPreset(10)">10Y</button>
+    <button class="preset" onclick="setPreset(5)">5Y</button>
+  </div>
+
+  <!-- Indicator chart -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 01</span>
+      <h2>The composite indicator</h2>
+      <span class="line"></span>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Smoothed score · 5-driver z-score · ±0.5 regime thresholds</div>
+      <div class="chart-sub">Mean of lagged sign-adjusted z-scores · 6-month rolling smooth · clipped ±3</div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--chart-ind);"></span>Indicator</span>
+        <span><span class="swatch thr"></span>±0.5 threshold</span>
+        <span><span class="swatch box" style="background: var(--band-long);"></span>Long</span>
+        <span><span class="swatch box" style="background: var(--band-cash);"></span>Cash</span>
+      </div>
+      <div class="chart-host short"><canvas id="indChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Equity curve -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 02</span>
+      <h2>Equity curves &amp; the 2.2× wealth advantage</h2>
+      <span class="line"></span>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Strategy vs. gold buy &amp; hold · log scale · rebased to $1</div>
+      <div class="chart-sub">Alpha source: cash periods that avoided 1981–85, 1997–99, 2012–15 bear markets</div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--chart-strat);"></span>Strategy</span>
+        <span><span class="swatch" style="background: var(--chart-gold); border-top: 2px dashed var(--chart-gold); border-radius:0; height: 0;"></span>Gold buy &amp; hold</span>
+      </div>
+      <div class="chart-host tall"><canvas id="eqChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Drivers -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 03</span>
+      <h2>Indicator components — five drivers, sign-adjusted</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      Each driver is z-scored on a 60-month backward window. Real yield and DXY are sign-flipped so positive z always means bullish gold. CPI, Gold/SPX and NFCI flow through with native sign.
+    </div>
+    <div class="driver-grid">
+      <div class="chart-wrap">
+        <div class="chart-title" style="color: var(--drv-ry);">Real yield Δ6M <span style="color: var(--text-faint); font-style: normal; font-size:10px; letter-spacing:0.1em;">·INVERTED</span></div>
+        <div class="chart-host short"><canvas id="drvRYChart"></canvas></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title" style="color: var(--drv-dxy);">DXY Δ12M <span style="color: var(--text-faint); font-style: normal; font-size:10px; letter-spacing:0.1em;">·INVERTED</span></div>
+        <div class="chart-host short"><canvas id="drvDXYChart"></canvas></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title" style="color: var(--drv-cpi);">CPI YoY Δ12M</div>
+        <div class="chart-host short"><canvas id="drvCPIChart"></canvas></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title" style="color: var(--drv-gs);">Gold ÷ SPX, Δ12M</div>
+        <div class="chart-host short"><canvas id="drvGSChart"></canvas></div>
+      </div>
+      <div class="chart-wrap full">
+        <div class="chart-title" style="color: var(--drv-nfci);">NFCI level <span style="color: var(--text-faint); font-style: normal; font-size:10px; letter-spacing:0.1em;">·FINANCIAL CONDITIONS</span></div>
+        <div class="chart-host short"><canvas id="drvNFCIChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Latest readings -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 04</span>
+      <h2>Latest readings · March 2026</h2>
+      <span class="line"></span>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span>Component readouts · lagged z-scores</span>
+        <span class="small">As of 2026-03-31</span>
+      </div>
+      <table class="readings">
+        <thead>
+          <tr>
+            <th>Driver</th>
+            <th style="text-align:right;">Lagged z</th>
+            <th>Read</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>z_RY · real yield Δ6M, inverted</td><td class="num">−0.04</td><td><span class="tag neutral">Neutral</span></td></tr>
+          <tr><td>z_DXY · dollar Δ12M, inverted</td><td class="num">+1.45</td><td><span class="tag bull">Bull</span></td></tr>
+          <tr><td>z_CPI · CPI YoY Δ12M</td><td class="num">−0.21</td><td><span class="tag neutral">Neutral</span></td></tr>
+          <tr><td>z_GS · gold/SPX Δ12M</td><td class="num">+2.72</td><td><span class="tag bull">Strong bull</span></td></tr>
+          <tr><td>z_NFCI · financial conditions</td><td class="num">−0.58</td><td><span class="tag bear">Bear</span></td></tr>
+          <tr><td><strong>Score (raw composite)</strong></td><td class="num"><strong>+0.67</strong></td><td>—</td></tr>
+          <tr><td><strong>Score (6M smoothed)</strong></td><td class="num"><strong>+0.54</strong></td><td><span class="tag bull">Bull regime</span></td></tr>
+          <tr><td><strong>Position</strong></td><td class="num"><strong>1.00</strong></td><td><span class="tag bull">Long · since Dec 2015</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /t1 -->
+
+
+<!-- ============================================================
+     TAB 2 — MACRO DASHBOARD
+     ============================================================ -->
+<div id="t2" class="tab-panel">
+
+  <div class="section-blurb" style="margin-bottom: 8px; font-size: 15px;">
+    Where the regime stands, by indicator. The story moves from the bedrock — real interest rates and inflation expectations — outward through the bond curve, the dollar, and finally the stress &amp; liquidity gauges that flag when the system is fragmenting.
+  </div>
+
+  <!-- Period controls for Tab 2 -->
+  <div class="controls">
+    <label>From <select id="t2StartSel"></select></label>
+    <label>To <select id="t2EndSel"></select></label>
+    <span style="color: var(--text-faint);">·</span>
+    <span>Presets</span>
+    <button class="preset" onclick="setT2Preset('all')">All</button>
+    <button class="preset" onclick="setT2Preset(20)">20Y</button>
+    <button class="preset" onclick="setT2Preset(10)">10Y</button>
+    <button class="preset" onclick="setT2Preset(5)">5Y</button>
+    <button class="preset" onclick="setT2Preset(2)">2Y</button>
+  </div>
+
+  <!-- 2A: Real rate regime -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 2A</span>
+      <h2>Real rate regime · the bedrock</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      Real rates determine whether bondholders are being paid or punished. TIPS yields tell you what's <em>priced</em>. Realized rates tell you what bondholders <em>experienced</em>. Inflation expectations tell you what the Fed has committed to.
+    </div>
+    <div class="lcd-row">
+      <div class="lcd">
+        <div class="lcd-label">10Y TIPS · DFII10</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8.88%</span>
+          <span class="lcd-value">+1.94%</span>
+        </div>
+        <div class="lcd-flag moderate">Moderate</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">5y5y forward breakeven</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8.88%</span>
+          <span class="lcd-value">+2.41%</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">Real rate proxy · 10Y − CPI YoY</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8.88%</span>
+          <span class="lcd-value">+1.30%</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Three real rate measures · since inception</div>
+      <div class="chart-sub">10Y nominal · TIPS · 5y5y forward breakeven inflation</div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--chart-gold);"></span>10Y Nominal Treasury</span>
+        <span><span class="swatch" style="background: var(--chart-strat);"></span>10Y TIPS (real)</span>
+        <span><span class="swatch" style="border-top: 1.5px dashed var(--drv-cpi); height: 0;"></span>5y5y forward breakeven</span>
+      </div>
+      <div class="chart-host"><canvas id="realRateChart"></canvas></div>
+      <div class="how-to-read">
+        <strong>How to read</strong> · The gap between Nominal and TIPS is implied inflation expectations. When TIPS sits above zero, bondholders are earning real returns. When 5y5y breakeven drifts above 2.7%, long-run inflation expectations are unmooring — that's the canary for financial repression. Currently TIPS at +1.94% and breakevens anchored near 2.4% means scenario 2 (productivity-led g&gt;r) is winning by market pricing.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2B: Term premium & curve -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 2B</span>
+      <h2>Term premium &amp; curve · the fiscal stress canary</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      Term premium separates "rates rising for good reasons" (growth, productivity) from "rates rising for bad reasons" (fiscal stress, foreign buyer fatigue). Stays the most under-watched signal in macro.
+    </div>
+    <div class="lcd-row">
+      <div class="lcd">
+        <div class="lcd-label">10Y term premium · ACM</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8.88%</span>
+          <span class="lcd-value">+0.42%</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">10Y − 2Y curve</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8.88%</span>
+          <span class="lcd-value">+0.38%</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">30Y treasury yield</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8.88%</span>
+          <span class="lcd-value">+4.61%</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">10Y term premium · NY Fed ACM model · since 1961</div>
+      <div class="chart-sub">Compensation bondholders demand for holding long bonds beyond expected average short rates</div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--drv-ry);"></span>10Y term premium</span>
+        <span><span class="swatch box" style="background: rgba(160, 69, 64, 0.20);"></span>Stress zone (&gt;1.5%)</span>
+        <span><span class="swatch" style="border-top: 1.5px dotted var(--thr); height: 0;"></span>Zero line</span>
+      </div>
+      <div class="chart-host short"><canvas id="termPremChart"></canvas></div>
+      <div class="how-to-read">
+        <strong>How to read</strong> · Negative (&lt;0%) means bondholders are accepting <em>less</em> than expected short rates — usually QE or flight-to-safety doing the work. Low (0 to 0.5%) is benign. Normal (0.5–1.5%) is healthy compensation for duration risk. Stress (&gt;1.5%) historically precedes fiscal crises (1970s repression, 1980s Volcker, 2008 GFC). Currently +0.42% — surprisingly low given $36T debt, suggesting hidden demand sources (regulatory captive bidders, stablecoin Treasury collateral) are absorbing the supply. <strong>Watch for expansion above 0.7% as scenario 1/3 confirmation.</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2C: Dollar & de-dollarization -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 2C</span>
+      <h2>Dollar &amp; de-dollarization · the structural story</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      Gold has decoupled from real rates because the marginal buyer changed. Central banks accumulating gold for sanctions insurance don't optimize against TIPS yields. The dollar weakening alongside positive real rates is the unusual signal worth tracking.
+    </div>
+    <div class="lcd-row">
+      <div class="lcd">
+        <div class="lcd-label">Gold · USD/oz</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">8888.</span>
+          <span class="lcd-value">$5,512</span>
+        </div>
+        <div class="lcd-sub"><span class="delta-pos">+38.2% YoY</span></div>
+        <div class="lcd-flag stressed">Stressed</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">Dollar index · DXY</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">888.8</span>
+          <span class="lcd-value">98.4</span>
+        </div>
+        <div class="lcd-sub"><span class="delta-neg">−6.2% YoY</span></div>
+        <div class="lcd-flag moderate">Moderate</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">Foreign Treasury holdings</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">$8.88T</span>
+          <span class="lcd-value">$7.92T</span>
+        </div>
+        <div class="lcd-sub">Share trending lower</div>
+        <div class="lcd-flag moderate">Moderate</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Gold &amp; the dollar · the divergence regime</div>
+      <div class="chart-sub">Gold (left axis) · DXY (right axis, inverted so up = weak dollar)</div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--chart-gold);"></span>Gold (USD/oz)</span>
+        <span><span class="swatch" style="border-top: 1.5px dashed var(--drv-dxy); height: 0;"></span>DXY (right, inverted)</span>
+      </div>
+      <div class="chart-host"><canvas id="goldDxyChart"></canvas></div>
+      <div class="how-to-read">
+        <strong>How to read</strong> · When both lines move together (up), it's the unusual de-dollarization signal — gold rising with dollar weakening despite normally-supportive real rates. When they diverge (gold up, dollar up), it's typical risk-off flight to USD. The 2022→present period is the first sustained co-movement of this kind in decades, driven by central bank gold buying as insurance against sanctions.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2D: Stress & liquidity -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 2D</span>
+      <h2>Stress &amp; liquidity · the tail risk gauges</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      The plumbing. NFCI captures aggregate financial stress. HY spreads and gold/copper ratios measure fear vs. growth at the margin. USD/JPY watches global funding pressure.
+    </div>
+    <div class="lcd-row">
+      <div class="lcd">
+        <div class="lcd-label">NFCI</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">-8.88</span>
+          <span class="lcd-value">−0.58</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">HY spread · BAML</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">888bp</span>
+          <span class="lcd-value">312bp</span>
+        </div>
+        <div class="lcd-flag calm">Calm</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">Gold ÷ Copper</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">88.8</span>
+          <span class="lcd-value">14.2</span>
+        </div>
+        <div class="lcd-flag moderate">Moderate</div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-label">USD/JPY</div>
+        <div class="lcd-value-wrap">
+          <span class="ghost">888.8</span>
+          <span class="lcd-value">158.4</span>
+        </div>
+        <div class="lcd-flag moderate">Moderate</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Stress index composite · since 1995</div>
+      <div class="chart-sub">Z-scored aggregate of NFCI, HY credit spreads, curve inversion, and USD/JPY volatility</div>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--drv-nfci);"></span>Composite stress (z-score)</span>
+        <span><span class="swatch" style="border-top: 1.5px dotted var(--thr); height: 0;"></span>Zero line</span>
+      </div>
+      <div class="chart-host short"><canvas id="stressChart"></canvas></div>
+      <div class="how-to-read">
+        <strong>How to read</strong> · Each component is z-scored on a 10-year rolling window then averaged. Negative readings (below zero) indicate easier-than-average financial conditions and tight credit spreads — the current state. Above +1 is elevated stress (think 2011 Eurozone, 2018 Q4, 2022 inflation panic). Above +2 is crisis territory (2008, 2020 COVID). Sustained moves up from current levels signal scenario 3 (tail risk) building. <strong>The composite is forward-looking by ~2–4 weeks for major risk-off episodes</strong> because it captures credit spreads and curve inversion that typically lead equity stress.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /t2 -->
+
+
+<!-- ============================================================
+     TAB 3 — SCENARIO TRACKER
+     ============================================================ -->
+<div id="t3" class="tab-panel">
+
+  <!-- Banner: dominant scenario -->
+  <div class="scen-banner">
+    <div>
+      <div class="lbl">Dominant scenario · March 2026</div>
+      <div class="name">Scenario 2 · <span class="lead"><em>Productivity-led g&gt;r</em></span></div>
+      <div style="font-size: 12px; color: var(--text-dim); margin-top: 6px; max-width: 580px; line-height: 1.5;">
+        Real rates positive, breakevens anchored, term premium contained. Bonds earning real returns; gold rising on de-dollarization rather than debasement panic. The benign version of g&gt;r — for now.
+      </div>
+    </div>
+    <div style="text-align: right;">
+      <div class="lbl">Probability</div>
+      <div class="pct">47%</div>
+    </div>
+  </div>
+
+  <!-- 3A: Three scenarios side by side -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 3A</span>
+      <h2>Three roads · current odds</h2>
+      <span class="line"></span>
+    </div>
+    <div class="scen-grid">
+      <div class="scen-card s1">
+        <div class="num">Scenario 01</div>
+        <h3>Inflation-led g&gt;r</h3>
+        <div class="desc">
+          The financial repression playbook. Real rates pushed below zero, inflation runs above target, debt inflated away over a decade. Bondholders pay the bill.
+        </div>
+        <div class="prob-bar"><div class="prob-fill" style="width: 42%;"></div></div>
+        <div class="prob-pct"><span class="small">Probability</span><span>42%</span></div>
+      </div>
+      <div class="scen-card s2">
+        <div class="num">Scenario 02</div>
+        <h3>Productivity-led g&gt;r</h3>
+        <div class="desc">
+          AI capex + supply-side tailwinds deliver real growth. Debt-to-GDP improves without inflation. Bonds OK, equities great, gold consolidates rather than crashes.
+        </div>
+        <div class="prob-bar"><div class="prob-fill" style="width: 47%;"></div></div>
+        <div class="prob-pct"><span class="small">Probability</span><span>47%</span></div>
+      </div>
+      <div class="scen-card s3">
+        <div class="num">Scenario 03</div>
+        <h3>Tail risk · confidence break</h3>
+        <div class="desc">
+          Treasury auction failure, Fed independence breach, or geopolitical shock. Term premium spikes, dollar weakens, gold goes vertical. Low probability, severe payoff.
+        </div>
+        <div class="prob-bar"><div class="prob-fill" style="width: 11%;"></div></div>
+        <div class="prob-pct"><span class="small">Probability</span><span>11%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3B: Probability history -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 3B</span>
+      <h2>Scenario probability history</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      Stacked area showing how the scenario blend has shifted month-by-month. Watch for sustained moves rather than single-month spikes.
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">P(S1 · S2 · S3) · stacked, summing to 1.0</div>
+      <div class="chart-host"><canvas id="scenStackChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 3C: Trigger watchlist -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 3C</span>
+      <h2>Trigger watchlist</h2>
+      <span class="line"></span>
+    </div>
+    <div class="card">
+      <div class="card-head"><span>If you see this · scenario shifts</span><span class="small" style="font-size: 11px;">5 to monitor</span></div>
+      <div class="trigger-list">
+        <div class="trigger-row">
+          <div class="what">5y5y BEI &gt; 2.7%</div>
+          <div class="desc">Long-run inflation expectations unmoor; Fed credibility under pressure.</div>
+          <div class="scen s1">→ S1</div>
+        </div>
+        <div class="trigger-row">
+          <div class="what">Term prem &gt; 1.5%</div>
+          <div class="desc">Bond market demands fiscal risk premium. Stress regime activating.</div>
+          <div class="scen s3">→ S3</div>
+        </div>
+        <div class="trigger-row">
+          <div class="what">Productivity &gt; 2%</div>
+          <div class="desc">AI capex translating to real output. Scenario 2 confirming.</div>
+          <div class="scen s2">→ S2</div>
+        </div>
+        <div class="trigger-row">
+          <div class="what">Auction B/C &lt; 2.0</div>
+          <div class="desc">Treasury bid-to-cover weak. Foreign buyer fatigue showing up at issuance.</div>
+          <div class="scen s3">→ S3</div>
+        </div>
+        <div class="trigger-row">
+          <div class="what">Gold/Copper ↑</div>
+          <div class="desc">Fear winning over growth. Hedging demand active even with positive real rates.</div>
+          <div class="scen s1">→ S1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D: Bridge to gold model -->
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 3D</span>
+      <h2>Bridge · how the scenarios feed the gold model</h2>
+      <span class="line"></span>
+    </div>
+    <div class="section-blurb">
+      The gold model doesn't take scenarios as input — it operates on its own 5-driver score. But the two should agree most of the time. When they don't, that's information: the model is tracking gold's micro-environment while scenarios track macro. Disagreement means the macro story hasn't yet shown up in the indicator components, or vice versa.
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Gold model position vs. dominant scenario · 1990 → 2026</div>
+      <div class="chart-sub">Background = dominant scenario each month · foreground = gold model position (long / cash)</div>
+      <div class="legend">
+        <span><span class="swatch box" style="background: rgba(212, 119, 78, 0.30);"></span>S1 · Inflation-led</span>
+        <span><span class="swatch box" style="background: rgba(122, 170, 173, 0.30);"></span>S2 · Productivity-led</span>
+        <span><span class="swatch box" style="background: rgba(160, 69, 64, 0.40);"></span>S3 · Tail risk</span>
+        <span><span class="swatch" style="background: var(--brass);"></span>Gold model · long</span>
+      </div>
+      <div class="chart-host short"><canvas id="bridgeChart"></canvas></div>
+      <div class="how-to-read">
+        <strong>How to read</strong> · Background shading is the macro scenario classifier's reading each month. Brass overlay is the gold model's actual position (filled = long, empty = cash). <em>Agreement</em> looks like brass-on-rust (S1 long) or brass-on-burgundy (S3 long) — the macro story justifies being in gold. <em>Disagreement</em> is when brass disappears during a teal (S2) period — the model is cash even though scenarios suggest gold isn't needed, which is the model doing its job. The most useful disagreements are when scenarios shift before the model does, or vice versa — that's the leading-indicator signal worth watching.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /t3 -->
+
+
+<!-- ============================================================
+     TAB 4 — ABOUT
+     ============================================================ -->
+<div id="t4" class="tab-panel">
+
+  <div class="section">
+    <div class="section-rule">
+      <span class="marker">§ 04</span>
+      <h2>Methodology &amp; data sources</h2>
+      <span class="line"></span>
+    </div>
+
+    <div class="about-grid">
+
+      <div class="card">
+        <h3>What this is</h3>
+        <p>A 5-driver macro indicator that switches a tactical gold sleeve between 100% gold and 100% cash. Drivers: real yield Δ6M, DXY Δ12M, CPI YoY Δ12M, gold/SPX Δ12M, NFCI level. Each driver z-scored on a 60-month backward window, sign-adjusted so positive = bullish gold, lagged one month, equally weighted, smoothed over 6 months, classified into bull/neutral/bear at ±0.5.</p>
+        <p>Position rule is <strong>early-buy long-flat</strong>: enter long on bull, exit on bear, but enter long on the first neutral after a bear (catches the 10–20% post-bear bounce that pure bull-confirmation misses).</p>
+      </div>
+
+      <div class="card">
+        <h3>What it doesn't do</h3>
+        <p>The strategy delivers its 2.2× wealth advantage by avoiding gold's worst bear markets — 1981–85, 1997–99, 2012–15. It does <strong>not</strong> generate alpha during bull markets; when gold trends, the strategy is just buy-and-hold. From December 2015 through March 2026 it has not flipped to cash even once.</p>
+        <p>Out-of-sample reliability should be considered moderate, not high. Roughly 10 major bear-to-bull transitions in 52 years.</p>
+      </div>
+
+      <div class="card">
+        <h3>Data sources</h3>
+        <p><strong>FRED</strong> · DGS10, DGS2, DGS30, DFII10, T5YIFR, T10YIE, THREEFYTP10, NFCI, CPIAUCSL, CPILFESL, PCEPILFE, DTWEXBGS, FDHBFIN, CBBTCUSD, DCOILWTICO, UNRATE, OPHNFB, RRPONTSYD, WALCL, GFDEGDQ188S, DFF.</p>
+        <p><strong>Local · TradingView</strong> · gold spot, DXY, S&amp;P 500, HY credit spread, copper, USD/JPY, China 10Y.</p>
+        <p style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--bg-rule);"><strong>Last refresh</strong> · 2026-03-31 18:42 SGT</p>
+      </div>
+
+      <div class="card">
+        <h3>Glossary</h3>
+        <p><strong>TIPS</strong> · Treasury Inflation-Protected Security. The yield is the market's real interest rate.</p>
+        <p><strong>Term premium</strong> · the extra yield demanded for holding long bonds beyond expected average short rates. NY Fed ACM model.</p>
+        <p><strong>Breakeven inflation</strong> · 10Y nominal − 10Y TIPS. Implied inflation expectation.</p>
+        <p><strong>5y5y forward</strong> · expected inflation between years 5 and 10. The Fed's preferred long-run measure.</p>
+        <p><strong>NFCI</strong> · Chicago Fed National Financial Conditions Index. Positive = stress.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /t4 -->
+
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer class="footer">
+  <div></div>
+  <div>Macro observatory · est. 2026</div>
+  <div>v 1.0</div>
+</footer>
+
+</div><!-- /shell -->
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
+
+<script>
+/* ============================================================
+   Tab switching
+   ============================================================ */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ============================================================
+   Backtest data (from existing dashboard, real values)
+   Format: [date, port_strat, port_gold, score, pos, z_RY, z_DXY, z_CPI, z_GS, z_NFCI]
+   ============================================================ */
+const BT = [["1974-01-01",1.0,1.0,1.708,1,1.835,-0.332,1.881,1.891,0.946],["1974-02-01",1.2259,1.2259,1.672,1,2.442,-1.369,1.861,2.487,0.011],["1974-03-01",1.305,1.305,1.352,1,1.417,-2.45,1.768,1.767,-0.69],["1974-04-01",1.2767,1.2767,1.118,1,1.017,-1.321,1.378,1.78,-0.249],["1974-05-01",1.1841,1.1841,0.916,1,0.234,-0.996,1.131,1.497,1.144],["1974-06-01",1.0885,1.0885,0.736,1,0.595,-1.897,1.223,0.046,3.021],["1974-07-01",1.1785,1.1785,0.59,1,0.293,-2.549,1.068,-0.533,3.576],["1974-08-01",1.177,1.177,0.507,1,0.204,-2.484,1.339,0.58,3.306],["1974-09-01",1.1412,1.1412,0.503,1,-0.638,-2.171,0.514,1.404,2.571],["1974-10-01",1.2594,1.2594,0.529,1,0.374,-2.045,0.882,2.227,1.955],["1974-11-01",1.3897,1.3897,0.52,1,0.612,-1.693,0.58,1.876,1.375],["1974-12-01",1.4062,1.4062,0.526,1,0.418,-0.592,0.629,1.774,0.942],["1975-01-01",1.3404,1.3404,0.564,1,0.488,0.041,0.335,1.408,0.715],["1975-02-01",1.378,1.378,0.486,1,-0.156,0.749,-0.037,-0.122,0.178],["1975-03-01",1.3517,1.3517,0.407,1,0.13,0.736,-0.384,-0.907,-0.278],["1975-04-01",1.256,1.256,0.153,1,-1.638,-0.04,-0.708,-1.224,-0.615],["1975-05-01",1.2726,1.2726,-0.119,1,-1.959,-0.282,-0.768,-1.497,-0.897],["1975-06-01",1.2636,1.2636,-0.438,1,-2.533,0.036,-1.324,-1.417,-1.157],["1975-07-01",1.2636,1.3057,-0.751,0,-2.425,-0.101,-1.362,-1.327,-1.203],["1975-08-01",1.2636,1.2259,-1.0,0,-1.96,-0.895,-1.432,-1.403,-1.165],["1975-09-01",1.2636,1.0708,-1.203,0,-2.105,-0.552,-1.472,-1.601,-1.078],["1975-10-01",1.2636,1.0753,-1.318,0,-1.833,-1.032,-1.995,-1.827,-0.962],["1975-11-01",1.2636,1.0339,-1.36,0,-1.31,-0.792,-1.938,-1.748,-0.878],["1975-12-01",1.2636,1.0617,-1.394,0,-1.194,-1.348,-2.03,-1.918,-0.932],["1976-01-01",1.2636,0.9714,-1.435,0,-1.1,-1.672,-1.969,-1.822,-1.101],["1976-02-01",1.2636,0.9985,-1.484,0,-1.383,-1.931,-1.9,-1.779,-1.332],["1976-03-01",1.2636,0.9767,-1.528,0,-1.07,-2.221,-1.783,-1.642,-1.41],["1976-04-01",1.2636,0.9706,-1.514,0,-0.594,-2.051,-1.564,-1.595,-1.4],["1976-05-01",1.2636,0.9488,-1.526,0,-0.868,-1.986,-1.497,-1.415,-1.273],["1976-06-01",1.2636,0.933,-1.488,0,-0.552,-2.142,-1.097,-1.352,-1.135],["1976-07-01",1.2636,0.8599,-1.433,0,-0.686,-1.782,-1.116,-1.324,-1.101],["1976-08-01",1.2636,0.7771,-1.341,0,-0.659,-0.978,-1.307,-1.467,-1.167],["1976-09-01",1.2636,0.8742,-1.228,0,-0.246,-0.837,-0.98,-1.474,-1.185],["1976-10-01",1.2636,0.9322,-1.118,0,-0.261,-0.431,-0.829,-1.25,-1.155],["1976-11-01",1.2636,0.9985,-1.011,0,-0.085,-0.823,-0.752,-1.064,-1.095],["1976-12-01",1.2636,1.0218,-0.915,0,-0.12,-0.592,-0.779,-0.862,-1.047],["1977-01-01",1.2636,1.009,-0.817,0,0.048,-0.38,-0.703,-0.94,-1.078],["1977-02-01",1.2636,1.0889,-0.719,0,0.038,-0.438,-0.531,-0.569,-1.137],["1977-03-01",1.2636,1.137,-0.624,0,0.289,-0.409,-0.153,-0.463,-1.137],["1977-04-01",1.2636,1.1145,-0.523,0,0.548,-0.138,0.005,-0.254,-1.055],["1977-05-01",1.232,1.0866,-0.401,1,0.742,0.079,0.211,-0.303,-0.911],["1977-06-01",1.226,1.0813,-0.295,1,0.642,0.216,0.035,-0.286,-0.819],["1977-07-01",1.2388,1.0926,-0.197,1,0.602,0.24,0.081,-0.263,-0.786],["1977-08-01",1.2644,1.1152,-0.096,1,0.682,0.375,0.184,-0.048,-0.788],["1977-09-01",1.3353,1.1777,-0.03,1,0.268,0.224,0.114,0.278,-0.761],["1977-10-01",1.3891,1.2252,-0.011,1,-0.134,0.206,0.111,0.178,-0.688],["1977-11-01",1.3856,1.2221,-0.015,1,-0.533,0.571,0.103,0.166,-0.62],["1977-12-01",1.43,1.2613,-0.005,1,-0.241,0.678,0.308,-0.083,-0.586],["1978-01-01",1.5274,1.3471,0.007,1,-0.452,0.983,0.298,0.043,-0.613],["1978-02-01",1.5743,1.3886,0.015,1,-0.325,1.05,0.283,0.255,-0.629],["1978-03-01",1.5897,1.4021,0.011,1,-0.727,1.277,-0.149,0.155,-0.566],["1978-04-01",1.4565,1.2846,0.029,1,-0.506,1.329,-0.204,-0.004,-0.391],["1978-05-01",1.5965,1.4081,0.034,1,-0.339,1.006,-0.312,-0.304,-0.223],["1978-06-01",1.5683,1.3833,0.049,1,-0.285,1.047,-0.05,-0.101,-0.072],["1978-07-01",1.7912,1.5798,0.083,1,-0.067,1.247,0.063,0.027,0.014],["1978-08-01",1.798,1.5858,0.128,1,0.154,1.506,0.168,0.163,-0.027],["1978-09-01",1.8859,1.6634,0.216,1,0.725,1.721,0.238,0.021,-0.064],["1978-10-01",2.055,1.8125,0.327,1,0.978,1.825,0.505,0.024,0.214],["1978-11-01",1.6768,1.4789,0.497,1,1.013,2.305,0.673,0.265,0.682],["1978-12-01",1.9551,1.7244,0.593,1,0.802,1.239,0.577,-0.159,0.96],["1979-01-01",2.02,1.7816,0.665,1,0.677,1.248,0.654,0.112,0.765],["1979-02-01",2.1591,1.9044,0.69,1,0.824,0.92,0.733,-0.164,0.381],["1979-03-01",2.0814,1.8358,0.695,1,0.911,0.724,1.154,-0.026,0.038],["1979-04-01",2.1276,1.8765,0.658,1,0.95,0.56,1.269,-0.167,-0.176],["1979-05-01",2.3999,2.1167,0.594,1,0.914,0.584,1.323,0.342,-0.159],["1979-06-01",2.423,2.137,0.594,1,1.224,0.469,1.201,0.523,-0.001],["1979-07-01",2.5382,2.2387,0.622,1,1.716,0.568,1.249,0.438,0.331],["1979-08-01",2.7892,2.4601,0.669,1,1.492,0.26,1.316,0.337,0.702],["1979-09-01",3.4534,3.0459,0.733,1,1.312,0.116,1.401,0.568,1.318],["1979-10-01",3.2929,2.9044,0.834,1,0.907,0.188,1.213,1.213,1.952],["1979-11-01",3.6754,3.2417,0.836,1,0.225,-1.374,1.129,0.735,2.365],["1979-12-01",4.6188,4.0738,0.932,1,0.47,0.181,1.343,2.09,2.205],["1980-01-01",6.0104,5.3012,0.995,1,0.535,-0.242,1.52,2.577,1.812],["1980-02-01",5.464,4.8193,1.098,1,0.308,0.102,1.606,3.476,1.698],["1980-03-01",4.431,3.9081,1.12,1,-0.631,-0.235,1.456,2.259,2.518],["1980-04-01",4.3285,3.8178,1.117,1,-0.202,-1.122,1.414,2.08,3.226],["1980-05-01",4.7383,4.1792,1.271,1,1.7,0.009,1.291,1.624,3.061],["1980-06-01",5.5835,4.9247,1.261,1,1.34,0.445,1.128,1.166,1.915],["1980-07-01",5.4811,4.8343,1.207,1,0.844,0.148,0.917,1.775,0.893],["1980-08-01",5.6006,4.9398,1.018,1,-0.33,-0.09,0.401,1.234,0.319],["1980-09-01",5.8781,5.1845,0.884,1,-0.198,-0.072,0.166,1.093,0.349],["1980-10-01",5.4811,4.8343,0.695,1,-0.996,-0.396,0.086,0.418,0.613],["1980-11-01",5.3325,4.7033,0.375,1,-2.948,-0.208,-0.056,0.072,1.206],["1980-12-01",5.1182,4.5143,0.078,1,-3.159,-0.842,-0.277,-0.458,1.837],["1981-01-01",4.3755,3.8592,-0.194,1,-2.933,-1.084,-0.669,-0.955,2.068],["1981-02-01",4.1535,3.6634,-0.417,1,-2.22,-1.83,-1.173,-1.487,1.532],["1981-03-01",4.1535,3.9571,-0.665,0,-2.206,-1.863,-1.498,-1.47,0.948],["1981-04-01",4.1535,3.6822,-0.84,0,-2.133,-0.836,-1.999,-1.26,0.695],["1981-05-01",4.1535,3.6099,-1.022,0,-2.433,-2.379,-2.185,-1.245,0.862],["1981-06-01",4.1535,3.2267,-1.176,0,-2.028,-3.347,-2.205,-1.357,1.402],["1981-07-01",4.1535,3.1867,-1.317,0,-2.179,-3.559,-2.131,-1.695,1.779],["1981-08-01",4.1535,3.3396,-1.348,0,-1.544,-3.513,-1.312,-1.606,1.844],["1981-09-01",4.1535,3.3358,-1.326,0,-1.259,-3.05,-1.204,-1.485,1.596],["1981-10-01",4.1535,3.247,-1.303,0,-1.123,-2.525,-1.106,-1.442,1.349],["1981-11-01",4.1535,3.1122,-1.178,0,-0.085,-1.933,-1.327,-1.419,1.113],["1981-12-01",4.1535,3.0331,-1.035,0,0.202,-1.374,-1.587,-1.329,0.853],["1982-01-01",4.1535,2.8961,-0.916,0,-0.354,-1.436,-1.71,-1.304,0.6],["1982-02-01",4.1535,2.7447,-0.86,0,-0.894,-1.184,-1.702,-1.143,0.45],["1982-03-01",4.1535,2.5166,-0.824,0,-0.792,-1.315,-1.731,-0.988,0.5],["1982-04-01",4.1535,2.6092,-0.826,0,-1.069,-1.544,-1.647,-1.175,0.555],["1982-05-01",4.1535,2.4262,-0.839,0,-1.262,-0.867,-1.511,-1.071,0.651],["1982-06-01",4.1535,2.3931,-0.843,0,-1.395,-0.536,-1.244,-1.06,0.889],["1982-07-01",4.1535,2.677,-0.784,0,-0.825,-0.778,-1.086,-0.858,1.122],["1982-08-01",4.1535,3.1514,-0.691,0,-0.318,-0.422,-1.611,-0.544,1.197],["1982-09-01",4.1535,3.0482,-0.597,0,0.115,-0.621,-1.75,-0.647,1.408],["1982-10-01",4.3403,3.1852,-0.495,1,0.592,-0.968,-2.03,-0.812,1.398],["1982-11-01",4.607,3.381,-0.437,1,1.108,-1.276,-1.699,-0.762,0.32],["1982-12-01",4.6481,3.4111,-0.438,1,0.548,-1.208,-1.587,-0.542,-0.616],["1983-01-01",5.3171,3.9021,-0.469,1,0.657,-0.748,-1.519,-0.55,-1.191],["1983-02-01",5.3171,3.1905,-0.528,0,0.297,-0.723,-1.311,-0.245,-1.491],["1983-03-01",5.3171,3.1777,-0.597,0,0.297,-0.314,-1.151,-0.711,-1.67],["1983-04-01",5.3171,3.2643,-0.645,0,0.145,-0.206,-0.881,-0.617,-1.721],["1983-05-01",5.3171,3.1514,-0.69,0,-0.032,-0.456,-0.671,-0.686,-1.797],["1983-06-01",5.3171,3.1514,-0.713,0,-0.265,-0.441,-0.895,-0.665,-1.843],["1983-07-01",5.3171,3.1084,-0.748,0,-0.704,0.003,-1.214,-0.707,-1.782],["1983-08-01",5.3171,3.1988,-0.789,0,-0.855,-0.234,-1.034,-0.878,-1.672],["1983-09-01",5.3171,3.0708,-0.826,0,-1.032,-0.288,-0.813,-0.908,-1.64],["1983-10-01",5.3171,2.8524,-0.826,0,-0.465,0.092,-0.417,-0.897,-1.598],["1983-11-01",5.3171,3.0798,-0.818,0,-0.977,0.346,-0.425,-0.865,-1.469],["1983-12-01",5.3171,2.9217,-0.766,0,-0.13,-0.137,-0.135,-0.792,-1.345],["1984-01-01",5.3171,2.8554,-0.678,0,0.683,-0.557,0.246,-0.824,-1.334],["1984-02-01",5.3171,3.0038,-0.555,0,1.469,-0.488,0.438,-0.962,-1.421],["1984-03-01",5.2557,2.9691,-0.388,1,1.521,0.111,0.64,-0.469,-1.471],["1984-04-01",5.0598,2.8584,-0.272,1,0.951,0.316,0.689,-0.438,-1.331],["1984-05-01",5.2464,2.9639,-0.165,1,0.795,-0.044,0.49,-0.419,-1.009],["1984-06-01",5.0132,2.8321,-0.089,1,-0.117,0.024,0.616,-0.171,-0.615],["1984-07-01",4.6693,2.6378,-0.03,1,-0.282,-0.072,0.935,-0.214,-0.361],["1984-08-01",4.7719,2.6958,-0.003,1,-0.117,-0.16,0.984,-0.344,-0.519],["1984-09-01",4.6826,2.6453,-0.021,1,-0.047,0.199,0.975,-0.496,-0.847],["1984-10-01",4.4787,2.5301,-0.059,1,0.302,-0.728,0.893,-0.411,-1.014],["1984-11-01",4.4453,2.5113,-0.059,1,1.025,-0.593,0.911,-0.367,-1.146],["1984-12-01",4.1281,2.3321,-0.042,1,1.759,-0.593,0.767,-0.433,-1.274],["1985-01-01",4.0974,2.3148,-0.053,1,1.638,-0.659,0.557,-0.499,-1.351],["1985-02-01",3.8482,2.1739,-0.082,1,1.064,-0.343,0.25,-0.61,-1.382],["1985-03-01",4.3933,2.4819,-0.184,1,0.635,-1.903,0.174,-0.891,-1.306],["1985-04-01",4.2187,2.3833,-0.206,1,0.7,-0.736,0.209,-0.58,-1.214],["1985-05-01",4.2587,2.4059,-0.245,1,0.395,-0.253,0.305,-0.549,-1.235],["1985-06-01",4.2347,2.3923,-0.274,1,0.988,0.088,0.438,-0.862,-1.286],["1985-07-01",4.468,2.5241,-0.257,1,1.107,0.601,0.522,-0.802,-1.23],["1985-08-01",4.5293,2.5587,-0.162,1,0.875,2.039,0.471,-0.461,-1.111],["1985-09-01",4.36,2.4631,0.037,1,1.313,1.848,0.448,0.035,-0.964],["1985-10-01",4.3547,2.4601,0.21,1,0.975,2.925,0.431,0.196,-0.937],["1985-11-01",4.3627,2.4646,0.379,1,1.083,2.892,0.448,0.302,-0.998],["1985-12-01",4.4133,2.4932,0.516,1,0.821,3.155,0.636,-0.135,-1.009],["1986-01-01",4.7039,2.6574,0.66,1,1.216,3.093,0.809,0.328,-0.935],["1986-02-01",4.5453,2.5678,0.803,1,1.521,2.986,1.097,1.4,-0.9],["1986-03-01",4.4627,2.5211,0.903,1,1.473,3.325,0.688,1.095,-0.901],["1986-04-01",4.6399,2.6212,0.869,1,1.331,2.499,0.11,-0.452,-0.9],["1986-05-01",4.6266,2.6137,0.833,1,0.82,2.643,-0.07,0.172,-0.933],["1986-06-01",4.6346,2.6182,0.759,1,0.021,2.14,-0.046,0.093,-0.943],["1986-07-01",4.9278,2.7839,0.653,1,-0.071,2.252,-0.068,0.097,-0.895],["1986-08-01",5.2424,2.9616,0.496,1,-0.229,1.996,-0.025,0.583,-0.913],["1986-09-01",5.7289,3.2364,0.346,1,-0.175,2.035,-0.018,0.282,-0.968],["1986-10-01",5.405,3.0535,0.345,1,-0.208,1.694,0.114,1.878,-0.916],["1986-11-01",5.2104,2.9435,0.317,1,0.118,1.378,0.022,1.176,-0.881],["1986-12-01",5.4237,3.064,0.336,1,0.451,1.308,-0.254,1.167,-0.862],["1987-01-01",5.4504,3.0791,0.355,1,-0.229,1.319,-0.441,2.055,-0.798],["1987-02-01",5.4304,3.0678,0.326,1,-0.033,1.39,-0.455,0.377,-0.75],["1987-03-01",5.6343,3.183,0.34,1,0.117,1.066,0.168,0.909,-0.676],["1987-04-01",6.0848,3.4375,0.4,1,0.764,1.295,1.102,1.589,-0.403],["1987-05-01",6.0009,3.3901,0.525,1,0.905,1.017,1.711,1.838,0.097],["1987-06-01",6.0275,3.4051,0.664,1,0.744,1.161,1.594,2.033,0.464],["1987-07-01",6.3328,3.5776,0.779,1,1.008,0.808,1.526,1.681,0.326],["1987-08-01",6.1142,3.4541,0.876,1,0.718,0.485,1.596,0.68,-0.044],["1987-09-01",6.1155,3.4548,0.915,1,0.273,0.524,1.742,0.2,0.013],["1987-10-01",6.2808,3.5482,0.818,1,-0.754,0.445,1.622,-0.867,0.989],["1987-11-01",6.6273,3.744,0.866,1,-0.155,0.878,1.71,2.071,2.502],["1987-12-01",6.5167,3.6815,0.969,1,0.14,0.955,1.875,3.612,2.524],["1988-01-01",6.0542,3.4202,1.015,1,-0.045,1.041,1.778,2.071,1.872],["1988-02-01",5.7569,3.2523,1.077,1,0.341,0.452,1.559,2.08,0.849],["1988-03-01",6.1035,3.448,1.11,1,0.243,0.381,1.165,1.605,0.354],["1988-04-01",6.0328,3.4081,1.189,1,0.34,0.384,0.619,2.131,0.345],["1988-05-01",6.1288,3.4623,1.017,1,-0.485,0.222,0.251,1.267,0.579],["1988-06-01",5.8342,3.2959,0.767,1,-0.828,0.186,0.224,1.447,0.579],["1988-07-01",5.8129,3.2839,0.584,1,-0.528,-0.12,0.135,1.072,0.661],["1988-08-01",5.8636,3.3125,0.436,1,-1.017,-0.171,0.093,1.034,0.906],["1988-09-01",5.3211,3.006,0.339,1,-1.16,-0.426,-0.168,1.785,0.818],["1988-10-01",5.533,3.1258,0.227,1,-0.276,-0.292,-0.137,0.664,0.501],["1988-11-01",5.7263,3.2349,0.137,1,0.11,-0.371,-0.168,-0.791,0.353],["1988-12-01",5.4957,3.1047,0.027,1,-0.001,-0.489,-0.295,-1.205,0.285],["1989-01-01",5.2757,2.9804,-0.087,1,-0.299,-1.006,-0.068,-1.066,0.253],["1989-02-01",5.2038,2.9398,-0.164,1,0.089,-0.929,0.106,-1.076,0.34],["1989-03-01",5.1984,2.9367,-0.195,1,0.137,-0.822,0.341,-0.536,0.781],["1989-04-01",5.0718,2.8652,-0.225,1,-0.068,-1.22,0.567,-1.075,1.38],["1989-05-01",4.8852,2.7598,-0.215,1,0.077,-1.1,0.548,-1.274,1.16],["1989-06-01",5.0292,2.8411,-0.166,1,1.305,-1.344,0.707,-1.561,0.664],["1989-07-01",5.0478,2.8517,-0.063,1,1.635,-0.891,0.661,-0.992,0.499],["1989-08-01",4.8705,2.7515,0.013,1,1.561,-0.377,0.498,-1.301,0.438],["1989-09-01",4.9585,2.8012,-0.014,1,0.64,-0.692,0.244,-1.623,0.525],["1989-10-01",5.0331,2.8434,-0.017,1,0.006,-0.481,0.095,-0.983,0.854],["1989-11-01",5.565,3.1438,-0.02,1,0.16,-0.798,0.155,-0.853,0.661],["1989-12-01",5.401,3.0512,-0.07,1,-0.474,-0.958,0.215,-0.713,0.19],["1990-01-01",5.569,3.1461,-0.175,1,-1.106,-0.545,0.096,-0.691,0.005],["1990-02-01",5.4504,3.0791,-0.221,1,-1.211,-0.142,0.405,0.317,0.077],["1990-03-01",4.9985,2.8238,-0.194,1,-0.068,-0.43,0.314,0.049,0.033],["1990-04-01",4.9505,2.7967,-0.191,1,0.023,-0.227,0.126,-0.413,0.081],["1990-05-01",4.9132,2.7756,-0.244,1,-1.871,-0.241,-0.331,0.036,0.142],["1990-06-01",4.7972,2.7101,-0.274,1,-1.843,0.199,-0.725,-0.116,-0.156],["1990-07-01",5.0545,2.8554,-0.272,1,-1.071,0.266,-0.452,-0.412,-0.533],["1990-08-01",5.1878,2.9307,-0.284,1,-0.846,0.238,-0.285,0.337,-0.345],["1990-09-01",5.4397,3.073,-0.192,1,-0.322,0.689,0.583,1.434,0.27],["1990-10-01",5.0825,2.8712,-0.027,1,0.531,0.424,0.989,1.887,0.726],["1990-11-01",5.1411,2.9044,0.241,1,2.094,0.662,0.996,1.138,0.883],["1990-12-01",5.2811,2.9834,0.484,1,2.113,0.532,0.801,0.314,0.889],["1991-01-01",4.9119,2.7748,0.707,1,1.789,0.262,0.824,0.612,0.979],["1991-02-01",4.9185,2.7786,0.783,1,0.93,0.326,0.049,-0.557,0.645],["1991-03-01",4.7599,2.689,0.674,1,0.118,0.279,-0.224,-0.705,-0.088],["1991-04-01",4.7679,2.6935,0.407,1,-1.123,-0.599,-0.56,-0.445,-0.728],["1991-05-01",4.8625,2.747,0.087,1,-1.513,-0.592,-0.236,-0.528,-0.961],["1991-06-01",4.9318,2.7861,-0.177,1,-1.512,-0.754,0.126,-0.137,-0.99],["1991-07-01",4.9425,2.7922,-0.484,1,-2.288,-1.294,-0.353,0.286,-1.092],["1991-08-01",4.9425,2.6574,-0.725,0,-1.918,-1.452,-0.733,-0.265,-1.484],["1991-09-01",4.9425,2.6905,-0.972,0,-1.707,-1.497,-1.803,-1.173,-1.824],["1991-10-01",4.9425,2.7071,-1.119,0,-1.167,-1.06,-2.358,-1.403,-1.876],["1991-11-01",4.9425,2.7944,-1.29,0,-1.727,-1.436,-2.746,-1.141,-1.924],["1991-12-01",4.9425,2.6649,-1.439,0,-1.524,-1.185,-2.408,-0.582,-2.031],["1992-01-01",4.9425,2.7026,-1.502,0,-0.376,-0.507,-2.453,-1.212,-2.089],["1992-02-01",4.9425,2.6664,-1.542,0,-1.014,-1.197,-2.238,-0.573,-2.04],["1992-03-01",4.9425,2.6017,-1.472,0,-0.603,-1.045,-1.868,-0.372,-1.993],["1992-04-01",4.9425,2.5444,-1.337,0,-0.425,-0.029,-1.275,-0.104,-1.983],["1992-05-01",4.9425,2.5331,-1.157,0,0.091,-0.06,-1.232,-0.337,-2.051],["1992-06-01",4.9425,2.5934,-1.014,0,-0.094,0.488,-1.417,-0.255,-2.159],["1992-07-01",4.9425,2.7214,-0.889,0,-0.501,1.302,-1.177,-0.344,-2.153],["1992-08-01",4.9425,2.6002,-0.676,0,1.121,1.219,-0.849,-0.083,-2.084],["1992-09-01",5.0012,2.631,-0.472,1,0.913,1.585,-0.523,0.163,-1.905],["1992-10-01",4.8681,2.561,-0.349,1,0.957,0.846,-0.293,-0.003,-1.64],["1992-11-01",4.8022,2.5264,-0.24,1,0.87,0.012,0.29,-0.103,-1.374],["1992-12-01",4.7679,2.5083,-0.202,1,0.403,-0.661,0.074,-0.677,-1.46],["1993-01-01",4.7264,2.4864,-0.201,1,0.311,-1.578,0.071,0.071,-1.718],["1993-02-01",4.7106,2.4782,-0.246,1,0.336,-0.917,0.552,-0.182,-1.797],["1993-03-01",4.8566,2.555,-0.305,1,0.708,-0.889,0.468,-0.102,-1.717],["1993-04-01",5.1128,2.6898,-0.361,1,0.282,-0.46,0.016,0.023,-1.678],["1993-05-01",5.4149,2.8486,-0.356,1,0.544,-0.106,0.138,0.894,-1.643],["1993-06-01",5.4277,2.8554,-0.265,1,0.797,-0.371,0.312,1.223,-1.553],["1993-07-01",5.8872,3.0971,-0.212,1,0.815,-1.581,0.15,0.95,-1.561],["1993-08-01",5.3776,2.8291,-0.22,1,-0.035,-2.05,-0.079,1.544,-1.631],["1993-09-01",5.1114,2.689,-0.27,1,-0.044,-2.24,-0.016,0.83,-1.567],["1993-10-01",5.2903,2.7831,-0.288,1,0.171,-1.622,-0.014,0.524,-1.435],["1993-11-01",5.3233,2.8005,-0.335,1,-0.001,-0.923,-0.244,0.833,-1.237],["1993-12-01",5.6095,2.9511,-0.382,1,-0.388,-0.609,-0.125,1.285,-1.146],["1994-01-01",5.4907,2.8886,-0.355,1,-0.458,-0.499,0.051,1.71,-1.222],["1994-02-01",5.475,2.8803,-0.317,1,-0.499,-0.341,-0.437,1.345,-1.196],["1994-03-01",5.6439,2.9691,-0.251,1,-1.28,-0.022,-0.365,1.619,-0.997],["1994-04-01",5.4077,2.8449,-0.191,1,-1.704,-0.127,-0.062,2.065,-0.741],["1994-05-01",5.5823,2.9367,-0.221,1,-2.145,-0.334,-0.384,0.974,-0.588],["1994-06-01",5.5437,2.9164,-0.272,1,-1.833,-0.482,-0.465,0.832,-0.563],["1994-07-01",5.4821,2.884,-0.291,1,-1.81,0.483,-0.1,0.944,-0.529],["1994-08-01",5.5938,2.9428,-0.284,1,-1.119,0.648,0.215,-0.035,-0.608],["1994-09-01",5.6911,2.994,-0.235,1,-0.573,0.486,0.398,0.751,-0.653],["1994-10-01",5.5093,2.8983,-0.16,1,-0.422,0.563,0.524,1.441,-0.4],["1994-11-01",5.5036,2.8953,-0.024,1,-0.373,1.074,0.238,0.817,-0.179],["1994-12-01",5.5022,2.8946,0.116,1,-0.29,0.748,0.247,0.959,0.048],["1995-01-01",5.4063,2.8441,0.2,1,-0.248,0.847,0.194,0.432,0.276],["1995-02-01",5.4149,2.8486,0.296,1,-0.168,0.786,0.734,0.558,0.081],["1995-03-01",5.6439,2.9691,0.335,1,0.089,0.903,0.672,0.044,-0.154],["1995-04-01",5.5609,2.9255,0.328,1,0.416,1.211,0.506,-0.454,-0.17],["1995-05-01",5.548,2.9187,0.374,1,1.425,1.097,1.019,-0.362,-0.22],["1995-06-01",5.5194,2.9036,0.424,1,2.189,1.041,1.037,-0.781,-0.29],["1995-07-01",5.5594,2.9247,0.452,1,2.015,0.843,0.783,-1.098,-0.179],["1995-08-01",5.538,2.9134,0.427,1,1.06,0.877,0.427,-0.946,-0.177],["1995-09-01",5.5322,2.9104,0.378,1,0.657,0.369,0.105,-0.828,-0.225],["1995-10-01",5.5007,2.8938,0.312,1,0.742,0.333,0.018,-1.414,-0.151],["1995-11-01",5.5623,2.9262,0.219,1,0.651,0.158,0.536,-1.014,-0.153],["1995-12-01",5.5551,2.9224,0.089,1,0.073,0.426,0.455,-1.451,-0.227],["1996-01-01",5.8471,3.0761,-0.006,1,0.213,0.46,0.429,-1.413,-0.157],["1996-02-01",5.7426,3.0211,-0.044,1,0.954,0.007,0.431,-1.003,-0.304],["1996-03-01",5.6654,2.9804,-0.07,1,0.363,-0.113,0.377,-0.936,-0.394],["1996-04-01",5.6324,2.9631,-0.089,1,0.212,-0.771,0.55,-1.167,0.129],["1996-05-01",5.6453,2.9699,-0.159,1,-0.502,-0.996,0.223,-0.991,0.356],["1996-06-01",5.4621,2.8735,-0.202,1,-0.849,-0.813,0.25,-0.844,0.251],["1996-07-01",5.6267,2.9601,-0.253,1,-0.882,-0.974,0.322,-0.879,0.41],["1996-08-01",5.6009,2.9465,-0.29,1,-1.173,-0.684,0.575,-0.132,0.389],["1996-09-01",5.4464,2.8652,-0.278,1,-0.783,-0.142,0.684,-0.309,0.199],["1996-10-01",5.4263,2.8547,-0.25,1,-0.213,-0.58,0.919,-0.657,0.313],["1996-11-01",5.339,2.8087,-0.187,1,0.596,-0.614,0.787,-0.902,0.112],["1996-12-01",5.2846,2.7801,-0.092,1,1.344,-0.444,1.166,-1.308,0.089],["1997-01-01",4.9525,2.6054,0.016,1,0.915,-0.544,1.462,-1.126,0.531],["1997-02-01",5.2259,2.7492,0.006,1,0.402,-0.871,0.678,-2.039,0.519],["1997-03-01",5.067,2.6657,-0.019,1,0.601,-1.301,0.775,-1.52,0.354],["1997-04-01",4.8838,2.5693,-0.087,1,-0.605,-1.199,0.11,-1.253,0.661],["1997-05-01",4.974,2.6167,-0.21,1,-1.201,-1.279,-0.532,-1.676,0.998],["1997-06-01",4.7994,2.5248,-0.388,1,-1.841,-0.946,-1.036,-1.719,1.032],["1997-07-01",4.7994,2.4744,-0.581,0,-1.376,-1.027,-1.178,-1.883,0.914],["1997-08-01",4.7994,2.4473,-0.723,0,-0.408,-1.851,-1.529,-2.544,0.773],["1997-09-01",4.7994,2.4699,-0.839,0,-0.561,-1.644,-1.101,-2.099,0.813],["1997-10-01",4.7994,2.4518,-0.872,0,0.305,-1.071,-1.676,-1.835,1.018],["1997-11-01",4.7994,2.308,-0.821,0,0.639,-0.907,-2.017,-1.512,1.643],["1997-12-01",4.7994,2.2304,-0.77,0,0.55,-1.114,-2.675,-1.547,1.81],["1998-01-01",4.7994,2.2011,-0.762,0,0.296,-1.337,-3.03,-1.736,1.496],["1998-02-01",4.7994,2.1973,-0.691,0,-0.01,-0.727,-2.356,-1.258,0.928],["1998-03-01",4.7994,2.2545,-0.67,0,-0.084,-0.332,-2.515,-1.688,0.656],["1998-04-01",4.7994,2.3373,-0.695,0,-0.364,-0.569,-2.038,-1.745,0.706],["1998-05-01",4.7994,2.256,-0.694,0,-0.458,0.017,-1.291,-1.23,0.822],["1998-06-01",4.7994,2.2093,-0.62,0,0.231,-0.397,-0.51,-1.1,1.01],["1998-07-01",4.8076,2.2131,-0.493,1,0.398,-0.394,-0.596,-0.987,1.086],["1998-08-01",4.4837,2.064,-0.343,1,0.305,0.109,-0.264,-0.467,1.389],["1998-09-01",4.7356,2.18,-0.115,1,0.984,0.121,-0.681,-0.254,2.717],["1998-10-01",4.7994,2.2093,0.185,1,1.549,0.393,-0.866,-0.05,3.956],["1998-11-01",4.7871,2.2037,0.409,1,1.299,0.515,-0.538,-0.494,3.812],["1998-12-01",4.711,2.1687,0.557,1,0.745,0.446,-0.213,-0.251,2.93],["1999-01-01",4.6767,2.1529,0.715,1,0.909,0.96,0.332,-0.331,2.394],["1999-02-01",4.6914,2.1596,0.802,1,0.863,0.819,0.533,-0.431,1.894],["1999-03-01",4.5769,2.1069,0.791,1,-0.197,0.322,0.831,0.189,1.409],["1999-04-01",4.6832,2.1559,0.688,1,-0.581,0.364,1.008,-0.0,1.096],["1999-05-01",4.4166,2.0331,0.618,1,0.038,-0.022,1.76,-0.222,0.945],["1999-06-01",4.2735,1.9672,0.535,1,-0.437,-0.123,0.993,-0.297,1.046],["1999-07-01",4.1827,1.9255,0.414,1,-1.131,-0.072,0.881,-0.43,1.374],["1999-08-01",4.1794,1.9239,0.347,1,-1.139,0.391,0.926,-0.423,1.921],["1999-09-01",4.9319,2.2703,0.346,1,-0.257,0.215,1.306,-0.89,2.127],["1999-10-01",4.8779,2.2455,0.446,1,0.185,-0.135,2.113,0.491,2.232],["1999-11-01",4.747,2.1852,0.467,1,-0.648,-0.576,1.822,0.488,2.06],["1999-12-01",4.7029,2.1649,0.544,1,-0.17,-0.593,1.841,0.682,1.721],["2000-01-01",4.6309,2.1318,0.628,1,-0.074,-0.886,1.664,0.793,1.65],["2000-02-01",4.7716,2.1965,0.688,1,-0.319,-1.027,1.685,1.694,1.432],["2000-03-01",4.554,2.0964,0.783,1,0.507,-0.702,2.177,1.917,1.467],["2000-04-01",4.4673,2.0565,0.829,1,1.116,-0.38,2.62,1.095,1.815],["2000-05-01",4.4428,2.0452,0.839,1,0.141,-0.945,0.958,1.352,1.947],["2000-06-01",4.7209,2.1732,0.899,1,0.42,-0.413,1.343,1.857,2.063],["2000-07-01",4.5311,2.0858,1.096,1,2.036,0.026,2.153,2.967,1.865],["2000-08-01",4.5393,2.0896,1.192,1,1.968,-1.101,1.713,2.421,1.372],["2000-09-01",4.482,2.0633,1.129,1,1.043,-1.56,1.228,1.741,1.021],["2000-10-01",4.3225,1.9898,0.924,1,-0.234,-1.949,0.893,0.403,0.995],["2000-11-01",4.4248,2.0369,0.862,1,1.177,-2.335,0.941,0.728,1.065],["2000-12-01",4.451,2.0489,0.823,1,1.444,-1.418,0.838,2.003,1.257],["2001-01-01",4.3422,1.9989,0.685,1,0.713,-0.32,0.749,2.471,1.269],["2001-02-01",4.3659,2.0098,0.623,1,1.203,0.122,0.92,1.546,0.736],["2001-03-01",4.2154,1.9405,0.634,1,1.199,0.042,0.2,1.869,0.508],["2001-04-01",4.3152,1.9864,0.697,1,0.351,-1.071,-1.026,3.152,0.577],["2001-05-01",4.3446,2.0,0.743,1,0.054,0.134,0.09,2.428,0.241],["2001-06-01",4.4264,2.0377,0.66,1,0.002,-0.717,0.328,2.156,-0.131],["2001-07-01",4.361,2.0075,0.458,1,-1.051,-1.127,-0.77,2.076,-0.304],["2001-08-01",4.4853,2.0648,0.268,1,-1.55,-0.159,-1.127,2.138,-0.485],["2001-09-01",4.792,2.2059,0.197,1,-1.345,1.055,-0.825,3.042,-0.229],["2001-10-01",4.5704,2.1039,0.241,1,-0.353,1.098,-1.06,3.473,0.143],["2001-11-01",4.4845,2.0644,0.223,1,-0.31,1.397,-1.499,2.912,-0.08],["2001-12-01",4.5589,2.0986,0.141,1,-1.689,1.036,-1.674,1.569,-0.072],["2002-01-01",4.6178,2.1258,0.097,1,-1.915,-0.159,-1.887,1.547,-0.086],["2002-02-01",4.8468,2.2312,0.012,1,-2.179,-0.554,-2.416,1.956,-0.545],["2002-03-01",4.9441,2.276,-0.161,1,-2.169,-0.114,-2.154,1.686,-0.721],["2002-04-01",5.0341,2.3174,-0.354,1,-2.565,0.87,-1.378,1.372,-0.811],["2002-05-01",5.3359,2.4563,-0.467,1,-1.606,1.137,-1.303,2.011,-1.203],["2002-06-01",5.1396,2.366,-0.447,1,-1.214,2.045,-1.897,2.262,-1.429],["2002-07-01",4.9613,2.2839,-0.307,1,-0.444,2.717,-1.657,2.118,-1.018],["2002-08-01",5.1118,2.3532,-0.049,1,1.01,2.141,-0.889,2.277,-0.545],["2002-09-01",5.2917,2.436,0.203,1,1.608,1.645,-0.638,1.801,-0.32],["2002-10-01",5.1936,2.3908,0.443,1,2.227,1.612,-0.718,1.726,-0.156],["2002-11-01",5.2001,2.3938,0.632,1,1.708,1.763,0.104,1.478,-0.348],["2002-12-01",5.6892,2.619,0.811,1,1.967,1.799,0.479,1.609,-0.721],["2003-01-01",6.018,2.7703,0.995,1,2.439,2.413,0.901,2.291,-0.815],["2003-02-01",5.7203,2.6333,1.104,1,1.674,2.802,1.442,2.457,-1.122],["2003-03-01",5.5142,2.5384,1.183,1,1.634,2.517,1.758,1.796,-1.22],["2003-04-01",5.5338,2.5474,1.191,1,1.063,2.381,1.414,1.589,-1.519],["2003-05-01",5.9575,2.7425,1.076,1,-0.096,2.133,0.431,0.809,-2.014],["2003-06-01",5.6483,2.6002,0.949,1,0.206,2.125,0.508,0.594,-2.113],["2003-07-01",5.7923,2.6664,0.695,1,-0.536,1.369,0.683,0.145,-2.06],["2003-08-01",6.1374,2.8253,0.393,1,-1.461,1.219,0.421,-0.022,-1.979],["2003-09-01",6.2977,2.8991,0.103,1,-1.851,1.006,0.302,0.02,-1.683],["2003-10-01",6.2814,2.8916,-0.092,1,-0.947,1.523,0.615,-0.421,-1.681],["2003-11-01",6.5088,2.9962,-0.183,1,-0.725,1.452,-0.125,-0.273,-1.787],["2003-12-01",6.7983,3.1295,-0.276,1,-1.036,1.636,-0.412,0.035,-1.714],["2004-01-01",6.5824,3.0301,-0.329,1,-0.729,1.533,-0.509,-0.594,-1.678],["2004-02-01",6.476,2.9812,-0.341,1,0.195,1.298,-0.744,-1.057,-1.88],["2004-03-01",6.9668,3.2071,-0.375,1,-0.168,1.231,-1.326,-1.04,-1.916],["2004-04-01",6.3272,2.9127,-0.446,1,-0.628,1.11,-1.146,-0.595,-1.781],["2004-05-01",6.4662,2.9767,-0.447,1,-0.05,0.614,0.033,-0.632,-1.454],["2004-06-01",6.4368,2.9631,-0.406,1,0.521,0.368,0.776,-0.705,-1.226],["2004-07-01",6.3877,2.9405,-0.328,1,0.624,0.521,0.932,-0.571,-1.15],["2004-08-01",6.6985,3.0836,-0.256,1,0.398,0.601,0.642,-0.526,-1.148],["2004-09-01",6.849,3.1529,-0.154,1,0.532,0.805,0.192,-0.541,-1.131],["2004-10-01",7.0028,3.2236,-0.083,1,0.33,0.442,0.066,-0.662,-1.092],["2004-11-01",7.3741,3.3946,0.007,1,1.138,0.675,0.889,-0.407,-1.083],["2004-12-01",7.1647,3.2982,0.057,1,0.766,0.74,1.319,-0.492,-1.089],["2005-01-01",6.9046,3.1785,0.047,1,0.302,0.48,0.991,-0.748,-0.98],["2005-02-01",7.1173,3.2764,0.022,1,0.015,0.165,0.594,-0.592,-0.968],["2005-03-01",7.0044,3.2244,0.025,1,0.029,0.288,1.054,-0.447,-0.966],["2005-04-01",7.1156,3.2756,0.049,1,0.079,0.12,1.166,-0.822,-0.746],["2005-05-01",6.8179,3.1386,0.015,1,-0.21,0.376,0.823,-0.311,-0.477],["2005-06-01",7.1075,3.2718,-0.092,1,-0.586,-0.211,-0.08,-0.707,-0.404],["2005-07-01",7.0208,3.2319,-0.175,1,-0.667,-0.401,-0.558,-0.407,-0.396],["2005-08-01",7.1132,3.2745,-0.197,1,-0.066,-0.314,0.109,-0.754,-0.42],["2005-09-01",7.6669,3.5294,-0.185,1,0.777,-0.253,0.946,-0.849,-0.314],["2005-10-01",7.6162,3.506,-0.118,1,1.466,-0.755,1.828,-0.625,-0.11],["2005-11-01",8.0595,3.7101,-0.148,1,0.437,-1.256,0.947,-0.634,-0.173],["2005-12-01",8.4205,3.8763,-0.186,1,-0.182,-1.983,-0.246,-0.599,-0.123],["2006-01-01",9.2994,4.2809,-0.167,1,0.187,-2.036,0.0,-0.063,0.041],["2006-02-01",9.1865,4.2289,-0.103,1,0.539,-1.262,0.989,0.402,-0.188],["2006-03-01",9.5472,4.395,-0.175,1,-0.665,-1.576,0.488,0.276,-0.372],["2006-04-01",10.7135,4.9319,-0.333,1,-1.86,-1.311,0.156,0.382,-0.305],["2006-05-01",10.5524,4.8577,-0.351,1,-1.243,-0.747,0.189,0.776,-0.206],["2006-06-01",10.0739,4.6374,-0.175,1,-0.053,-0.112,0.899,1.317,0.113],["2006-07-01",10.4142,4.7941,-0.028,1,0.003,-0.035,1.296,0.719,0.549],["2006-08-01",10.2563,4.7214,0.015,1,-0.445,-0.038,0.765,1.173,0.313],["2006-09-01",9.786,4.5049,0.097,1,0.001,-0.264,0.133,0.778,-0.026],["2006-10-01",9.9292,4.5708,0.075,1,-1.208,-0.131,-2.249,-0.011,-0.005],["2006-11-01",10.5998,4.8795,-0.025,1,-1.663,0.034,-2.308,-0.142,-0.167],["2006-12-01",10.4142,4.7941,-0.163,1,-1.288,0.57,-1.106,0.007,-0.134],["2007-01-01",10.6784,4.9157,-0.316,1,-1.169,0.374,-0.706,-0.39,-0.166],["2007-02-01",10.6784,5.0399,-0.532,0,-1.74,-0.108,-1.612,-0.684,-0.594],["2007-03-01",10.6784,4.9989,-0.65,0,-1.267,0.199,-1.082,-0.373,-0.38],["2007-04-01",10.6784,5.1096,-0.534,0,0.651,0.226,-0.617,-0.589,0.209],["2007-05-01",10.3951,4.974,-0.419,1,0.98,-0.102,-0.963,-1.121,0.395],["2007-06-01",10.2236,4.8919,-0.427,1,0.14,-0.468,-1.215,-1.387,0.74],["2007-07-01",10.4541,5.0023,-0.43,1,-0.297,-0.303,-1.434,-1.154,1.051],["2007-08-01",10.5948,5.0696,-0.253,1,0.137,-0.084,-1.659,-1.012,3.184],["2007-09-01",11.7028,5.5998,-0.083,1,-0.603,-0.128,-1.818,-0.817,5.576],["2007-10-01",12.5393,6.0,0.089,1,0.003,0.537,0.548,-0.119,4.05],["2007-11-01",12.3103,5.8904,0.347,1,1.105,0.639,1.641,0.298,3.256],["2007-12-01",13.1178,6.2768,0.731,1,2.466,0.318,1.732,0.194,4.625],["2008-01-01",14.5761,6.9746,1.091,1,2.292,0.364,1.064,0.912,4.025],["2008-02-01",15.3192,7.3302,1.426,1,2.797,0.798,1.532,2.256,3.228],["2008-03-01",14.4197,6.8998,1.728,1,2.794,0.919,1.155,2.603,3.82],["2008-04-01",13.8108,6.6084,1.887,1,1.869,1.188,0.731,2.298,3.679],["2008-05-01",13.9512,6.6756,1.881,1,0.729,0.836,0.828,1.683,2.695],["2008-06-01",14.5637,6.9687,1.758,1,-0.456,0.941,0.869,2.076,2.206],["2008-07-01",14.3857,6.8835,1.753,1,0.618,0.952,1.508,2.938,2.488],["2008-08-01",13.0783,6.2579,1.664,1,0.602,0.604,2.11,2.299,2.333],["2008-09-01",13.7062,6.5584,1.5,1,0.559,-0.199,2.153,1.444,2.416],["2008-10-01",11.4031,5.4563,1.371,1,0.28,-1.184,1.203,1.904,3.69],["2008-11-01",12.8726,6.1595,1.227,1,-0.619,-2.548,-0.208,1.472,4.361],["2008-12-01",13.8753,6.6393,1.026,1,-1.879,-2.617,-2.436,2.544,3.986],["2009-01-01",14.6008,6.9864,0.691,1,-2.843,-1.459,-2.774,2.346,3.18],["2009-02-01",14.8361,7.099,0.285,1,-3.421,-2.507,-2.722,2.046,2.373],["2009-03-01",14.4647,6.9213,-0.059,1,-3.079,-2.93,-2.427,2.252,2.233],["2009-04-01",13.9745,6.6867,-0.392,1,-2.699,-2.661,-2.44,1.806,1.919],["2009-05-01",13.9745,7.3727,-0.599,0,-2.073,-2.233,-2.316,1.522,1.332],["2009-06-01",13.9745,6.9762,-0.675,0,-1.523,-1.26,-2.452,1.741,0.816],["2009-07-01",13.9745,7.1841,-0.765,0,-1.37,-1.406,-2.721,0.616,0.646],["2009-08-01",13.9745,7.163,-0.775,0,-1.327,-0.96,-2.988,0.388,0.332],["2009-09-01",13.9745,7.5879,-0.738,0,-0.93,-0.255,-2.512,0.744,0.135],["2009-10-01",13.9745,7.8731,-0.686,0,-0.712,0.276,-2.192,0.098,-0.002],["2009-11-01",13.9745,8.8819,-0.548,0,0.25,1.123,-1.249,0.363,-0.095],["2009-12-01",12.9982,8.2614,-0.344,1,1.963,1.397,0.536,-0.315,-0.16],["2010-01-01",12.8088,8.141,-0.12,1,2.147,0.349,1.272,-0.998,-0.288],["2010-02-01",13.2424,8.4166,0.117,1,2.39,0.725,1.21,-1.421,-0.347],["2010-03-01",13.1884,8.3823,0.258,1,1.772,0.84,0.985,-1.786,-0.404],["2010-04-01",13.9695,8.8788,0.375,1,1.573,0.429,1.187,-1.615,-0.583],["2010-05-01",14.4096,9.1585,0.392,1,1.059,0.225,1.184,-1.033,-0.523],["2010-06-01",14.7191,9.3552,0.248,1,0.004,-1.138,1.232,-0.769,-0.248],["2010-07-01",13.9926,8.8934,0.138,1,-0.383,-0.933,0.969,-0.218,-0.259],["2010-08-01",14.7789,9.3932,0.034,1,-0.27,-0.556,1.267,-0.558,-0.446],["2010-09-01",15.5045,9.8544,-0.017,1,0.091,-0.8,1.019,0.057,-0.478],["2010-10-01",16.1055,10.2364,-0.053,1,0.105,-0.385,0.971,-0.237,-0.549],["2010-11-01",16.4227,10.438,-0.109,1,0.051,-0.236,0.586,-0.499,-0.657],["2010-12-01",16.8409,10.7038,-0.17,1,-0.162,-1.051,-0.175,-0.694,-0.678],["2011-01-01",15.7886,10.0349,-0.204,1,0.042,-0.298,-0.353,-0.466,-0.756],["2011-02-01",16.7193,10.6265,-0.246,1,-0.005,0.108,-0.186,-0.916,-0.831],["2011-03-01",16.9695,10.7855,-0.279,1,0.059,0.334,0.124,-0.816,-0.811],["2011-04-01",18.5267,11.7752,-0.281,1,0.307,0.558,0.248,-0.481,-0.788],["2011-05-01",18.1936,11.5635,-0.228,1,0.613,1.051,0.43,-0.395,-0.842],["2011-06-01",17.7723,11.2958,-0.091,1,1.04,1.334,0.63,-0.876,-0.802],["2011-07-01",19.2778,12.2526,0.015,1,1.033,1.29,0.939,-1.149,-0.76],["2011-08-01",21.6291,13.7471,0.14,1,1.143,0.796,0.88,-0.245,-0.633],["2011-09-01",19.2383,12.2275,0.274,1,1.266,0.948,0.982,0.09,-0.374],["2011-10-01",20.3186,12.9141,0.336,1,1.187,-0.241,0.979,0.053,-0.281],["2011-11-01",20.6911,13.1509,0.335,1,0.624,-0.099,0.836,-0.183,-0.362],["2011-12-01",18.5418,11.7848,0.316,1,0.31,0.141,0.818,-0.178,-0.342],["2012-01-01",20.5878,13.0852,0.252,1,0.243,-0.395,0.551,-0.533,-0.435],["2012-02-01",20.1043,12.778,0.17,1,0.021,-0.443,0.429,0.134,-0.633],["2012-03-01",19.7656,12.5627,0.015,1,-0.475,-0.471,0.24,-0.297,-0.733],["2012-04-01",19.7249,12.5368,-0.139,1,-0.903,-0.646,-0.04,-0.583,-0.768],["2012-05-01",18.4883,11.7508,-0.284,1,-0.64,-1.048,-0.301,-0.824,-0.712],["2012-06-01",18.9275,12.03,-0.446,1,-0.715,-1.363,-0.604,-0.831,-0.592],["2012-07-01",18.9275,12.1576,-0.56,0,-0.69,-1.17,-0.645,-0.893,-0.614],["2012-08-01",18.9275,12.7401,-0.705,0,-0.713,-1.335,-0.746,-1.312,-0.714],["2012-09-01",18.9275,13.3453,-0.808,0,-0.489,-1.058,-0.713,-1.788,-0.801],["2012-10-01",18.9275,12.9565,-0.822,0,-0.135,-0.207,-0.629,-1.531,-0.859],["2012-11-01",18.9275,12.9132,-0.813,0,-0.047,-0.525,-0.443,-1.361,-0.867],["2012-12-01",18.9275,12.6223,-0.779,0,-0.07,-0.218,-0.519,-1.419,-0.849],["2013-01-01",18.9275,12.5276,-0.722,0,-0.066,0.099,-0.385,-1.085,-0.873],["2013-02-01",18.9275,11.8946,-0.654,0,-0.162,0.075,-0.377,-1.427,-0.894],["2013-03-01",18.9275,12.0252,-0.587,0,-0.008,-0.367,-0.211,-1.376,-0.873],["2013-04-01",18.9275,11.1201,-0.58,0,-0.317,-0.452,-0.26,-1.257,-0.858],["2013-05-01",18.9275,10.4515,-0.585,0,-0.477,-0.28,-0.27,-1.502,-0.874],["2013-06-01",18.9275,9.2973,-0.575,0,-0.446,0.142,0.006,-1.654,-0.834],["2013-07-01",18.9275,9.978,-0.59,0,-0.347,-0.005,0.163,-1.803,-0.747],["2013-08-01",18.9275,10.5067,-0.558,0,-0.13,0.419,0.321,-1.683,-0.753],["2013-09-01",18.9275,10.007,-0.55,0,-0.616,0.118,0.127,-1.486,-0.733],["2013-10-01",18.9275,9.9634,-0.538,0,-0.514,0.205,-0.108,-1.661,-0.721],["2013-11-01",18.9275,9.4218,-0.524,0,-0.472,0.185,-0.25,-1.675,-0.77],["2013-12-01",18.9275,9.0745,-0.525,0,-0.292,0.12,-0.012,-1.79,-0.846],["2014-01-01",18.9275,9.3711,-0.527,0,-0.309,0.15,0.081,-1.81,-0.893],["2014-02-01",18.9275,9.9892,-0.555,0,-0.181,-0.18,0.104,-1.518,-0.893],["2014-03-01",18.9275,9.6687,-0.54,0,-0.174,0.513,-0.209,-1.31,-0.974],["2014-04-01",19.0373,9.7248,-0.496,1,0.208,0.596,0.139,-1.334,-1.074],["2014-05-01",18.4214,9.4102,-0.422,1,0.55,0.465,0.419,-1.053,-1.141],["2014-06-01",19.5635,9.9936,-0.35,1,0.63,0.568,0.352,-0.961,-1.251],["2014-07-01",18.9115,9.6605,-0.272,1,0.509,0.611,0.136,-0.425,-1.282],["2014-08-01",18.9803,9.6957,-0.239,1,0.113,-0.055,-0.034,-0.557,-1.136],["2014-09-01",17.809,9.0973,-0.23,1,0.365,-0.185,-0.046,-0.96,-1.066],["2014-10-01",17.2935,8.834,-0.275,1,-0.09,-1.167,0.124,-0.825,-0.85],["2014-11-01",17.2034,8.788,-0.35,1,-0.345,-1.331,0.17,-0.816,-0.706],["2014-12-01",17.4355,8.9065,-0.454,1,-0.704,-1.488,-0.282,-0.582,-0.704],["2015-01-01",17.4355,9.6683,-0.582,0,-0.984,-1.93,-0.797,-0.243,-0.336],["2015-02-01",17.4355,9.1351,-0.692,0,-1.193,-2.392,-1.349,-0.044,-0.009],["2015-03-01",17.4355,8.913,-0.816,0,-1.32,-2.663,-0.945,-0.609,-0.08],["2015-04-01",17.4355,8.9186,-0.912,0,-1.022,-2.871,-1.181,-0.478,-0.131],["2015-05-01",17.4355,8.964,-0.997,0,-1.254,-2.208,-1.457,-0.496,-0.15],["2015-06-01",17.4355,8.8281,-1.041,0,-0.972,-2.293,-1.429,-0.279,-0.121],["2015-07-01",17.4355,8.2498,-1.041,0,-0.537,-2.078,-1.225,-0.404,-0.051],["2015-08-01",17.4355,8.5462,-0.994,0,-0.007,-1.954,-1.113,-0.66,0.178],["2015-09-01",17.4355,8.3951,-0.862,0,0.158,-1.467,-0.908,-0.065,0.627],["2015-10-01",17.4355,8.6007,-0.709,0,-0.03,-1.006,-1.018,0.235,0.706],["2015-11-01",17.4355,8.0193,-0.556,0,0.16,-0.912,-0.85,0.239,0.381],["2015-12-01",17.3692,7.9887,-0.406,1,0.323,-1.106,-0.342,0.051,0.503],["2016-01-01",18.3063,8.4198,-0.226,1,0.524,-0.617,0.218,0.056,0.918],["2016-02-01",20.2785,9.3268,0.011,1,1.156,-0.122,1.269,0.024,1.21],["2016-03-01",20.1858,9.2842,0.207,1,0.961,0.124,0.864,1.211,1.083],["2016-04-01",21.1748,9.7391,0.392,1,1.016,0.935,0.831,0.863,0.785],["2016-05-01",19.8975,9.1516,0.587,1,1.198,0.709,1.082,1.192,0.688],["2016-06-01",21.644,9.9549,0.74,1,0.917,0.693,0.926,0.762,0.731],["2016-07-01",22.122,10.1747,0.856,1,1.149,0.53,0.864,1.194,0.844],["2016-08-01",21.4307,9.8568,0.879,1,0.161,0.896,0.71,1.659,0.783],["2016-09-01",21.5466,9.9101,0.864,1,0.488,0.671,0.902,0.899,0.849],["2016-10-01",20.9049,9.615,0.896,1,1.09,0.823,1.534,0.933,1.005],["2016-11-01",19.2098,8.8353,0.898,1,0.76,0.494,1.594,1.242,0.84],["2016-12-01",18.8542,8.6718,0.89,1,0.271,0.54,1.383,0.975,0.619],["2017-01-01",19.8195,9.1157,0.841,1,0.219,0.225,1.54,0.682,0.449],["2017-02-01",20.4371,9.3998,0.827,1,0.972,0.737,1.421,0.309,0.346],["2017-03-01",20.4506,9.406,0.821,1,1.303,0.314,1.95,-0.297,0.356],["2017-04-01",20.7635,9.5499,0.715,1,0.248,-0.117,1.55,0.126,0.407],["2017-05-01",20.773,9.5543,0.592,1,0.168,-0.165,1.07,-0.084,0.249],["2017-06-01",20.336,9.3533,0.542,1,0.507,0.556,0.853,0.338,0.027],["2017-07-01",20.7844,9.5595,0.463,1,-0.264,0.756,0.646,-0.297,-0.097],["2017-08-01",21.6335,9.9501,0.365,1,-0.737,1.036,0.868,-0.194,-0.13],["2017-09-01",20.9575,9.6392,0.291,1,-0.755,1.096,0.849,0.222,0.0],["2017-10-01",20.8123,9.5724,0.257,1,-0.181,0.943,0.617,-0.127,-0.065],["2017-11-01",20.8747,9.6011,0.24,1,-0.249,1.11,0.333,-0.227,-0.243],["2017-12-01",21.3368,9.8136,0.241,1,0.193,1.643,0.45,0.34,-0.293],["2018-01-01",22.0213,10.1284,0.306,1,0.563,1.782,0.062,0.66,-0.382],["2018-02-01",21.5846,9.9276,0.327,1,0.052,1.786,-0.356,0.291,-0.317],["2018-03-01",21.6968,9.9792,0.321,1,-0.469,1.706,-0.537,0.446,0.1],["2018-04-01",21.539,9.9066,0.356,1,-0.277,1.61,-0.148,0.64,0.414],["2018-05-01",21.2582,9.7775,0.396,1,-0.119,1.224,0.204,0.515,0.105],["2018-06-01",20.5145,9.4354,0.385,1,0.27,0.71,0.773,0.342,-0.097],["2018-07-01",20.0364,9.2155,0.364,1,0.29,0.467,0.982,0.224,0.087],["2018-08-01",19.6637,9.0441,0.36,1,0.572,0.143,0.919,-0.19,-0.099],["2018-09-01",19.5125,8.9745,0.316,1,0.455,0.038,0.527,-0.729,-0.363],["2018-10-01",19.8863,9.1465,0.198,1,-0.519,0.097,-0.004,-0.534,-0.339],["2018-11-01",20.0071,9.202,0.137,1,-0.37,0.04,0.27,0.217,-0.06],["2018-12-01",20.9957,9.6567,0.046,1,-1.253,-0.168,-0.2,0.279,0.586],["2019-01-01",21.6322,9.9495,0.001,1,-1.032,-0.143,-0.306,1.362,0.828],["2019-02-01",21.496,9.8868,-0.093,1,-1.527,-0.47,-0.795,1.139,0.174],["2019-03-01",21.1594,9.732,-0.174,1,-1.433,-0.322,-0.875,0.612,-0.47],["2019-04-01",21.014,9.6652,-0.186,1,0.182,-0.515,-0.591,-0.006,-0.726],["2019-05-01",21.37,9.8289,-0.253,1,0.15,-0.286,-0.589,-0.345,-0.846],["2019-06-01",23.0748,10.613,-0.235,1,0.692,-0.015,-1.035,0.741,-0.603],["2019-07-01",23.1298,10.6383,-0.251,1,0.49,0.292,-1.149,1.219,-0.621],["2019-08-01",24.8942,11.4498,-0.16,1,1.313,-0.025,-1.012,1.661,-0.695],["2019-09-01",24.108,11.0882,0.053,1,1.97,0.016,-0.879,3.009,-0.223],["2019-10-01",24.764,11.3899,0.186,1,0.681,-0.05,-0.632,2.431,-0.083],["2019-11-01",23.9685,11.024,0.296,1,0.691,0.452,-0.709,1.505,-0.541],["2019-12-01",24.8382,11.424,0.344,1,0.802,0.338,-0.072,0.946,-0.795],["2020-01-01",26.0311,11.9727,0.359,1,0.884,0.415,0.256,-0.269,-0.617],["2020-02-01",25.9749,11.9469,0.382,1,1.616,0.181,0.949,0.534,-1.342],["2020-03-01",25.8203,11.8758,0.445,1,1.158,0.129,0.654,1.636,2.192],["2020-04-01",27.6134,12.7004,0.671,1,0.868,0.122,-0.509,3.079,5.567],["2020-05-01",28.3173,13.0242,0.762,1,-0.959,0.12,-1.784,2.765,3.993],["2020-06-01",29.1565,13.4102,0.714,1,-1.619,0.228,-1.735,1.675,1.24],["2020-07-01",32.3505,14.8792,0.695,1,-0.957,0.074,-1.137,1.616,0.494],["2020-08-01",32.2144,14.8166,0.655,1,-1.41,1.189,-1.056,2.078,-0.07],["2020-09-01",30.8695,14.198,0.455,1,-1.383,1.472,-0.705,0.643,-0.26],["2020-10-01",30.7623,14.1487,0.183,1,-0.496,1.2,-0.568,0.991,-0.151],["2020-11-01",29.0911,13.3801,0.095,1,0.706,0.767,-0.836,1.105,-0.235],["2020-12-01",31.0805,14.2951,0.126,1,0.861,1.385,-1.29,0.357,-0.595],["2021-01-01",30.2512,13.9137,0.12,1,0.146,1.389,-1.352,0.509,-0.799],["2021-02-01",28.3952,13.0601,0.041,1,-0.644,1.4,-1.548,0.008,-0.863],["2021-03-01",27.9548,12.8575,-0.029,1,-0.84,1.429,-0.904,-1.134,-0.882],["2021-04-01",29.0103,13.343,-0.086,1,0.093,1.097,1.113,-2.053,-0.987],["2021-05-01",31.2162,14.3575,0.034,1,3.051,1.452,3.539,-1.776,-1.147],["2021-06-01",28.9859,13.3317,0.233,1,3.828,1.526,3.8,-1.278,-1.18],["2021-07-01",29.7018,13.661,0.408,1,3.864,0.83,3.282,-1.743,-1.099],["2021-08-01",29.6955,13.6581,0.587,1,3.639,0.071,2.778,-1.883,-0.879],["2021-09-01",28.7663,13.2307,0.758,1,3.138,-0.282,2.35,-1.617,-0.802],["2021-10-01",29.1971,13.4288,0.851,1,2.301,-0.246,2.285,-1.468,-0.811],["2021-11-01",29.0551,13.3636,0.741,1,1.602,-0.196,2.75,-1.725,-0.596],["2021-12-01",29.9408,13.7709,0.592,1,1.472,-1.053,2.907,-0.969,-0.144],["2022-01-01",29.4232,13.5329,0.461,1,1.142,-1.386,2.746,-1.134,-0.166],["2022-02-01",31.2628,14.379,0.385,1,1.079,-1.395,2.699,-0.869,-0.073],["2022-03-01",31.7143,14.5866,0.402,1,1.469,-1.338,2.554,0.072,0.563],["2022-04-01",31.0576,14.2846,0.462,1,1.542,-1.16,2.244,0.275,0.955],["2022-05-01",30.0831,13.8364,0.432,1,0.053,-2.442,1.388,0.783,1.147],["2022-06-01",29.5897,13.6094,0.366,1,-0.306,-2.331,1.142,0.158,1.561],["2022-07-01",28.9173,13.3002,0.387,1,-0.207,-2.23,1.133,1.189,1.967],["2022-08-01",28.0132,12.8843,0.344,1,-0.497,-2.34,0.907,0.435,1.625],["2022-09-01",27.1931,12.5072,0.204,1,-1.379,-2.531,0.826,0.671,1.529],["2022-10-01",26.7468,12.3019,0.048,1,-2.005,-2.568,0.709,0.979,2.063],["2022-11-01",28.9496,13.315,-0.031,1,-1.772,-2.337,0.14,0.679,1.866],["2022-12-01",29.8591,13.7334,-0.085,1,-2.11,-1.196,-0.411,0.809,1.518],["2023-01-01",31.5691,14.5198,-0.205,1,-2.793,-0.884,-0.823,1.483,1.253],["2023-02-01",29.9063,13.755,-0.271,1,-2.292,-0.509,-1.006,1.154,0.803],["2023-03-01",32.2416,14.8291,-0.343,1,-2.204,-0.862,-1.299,0.361,0.96],["2023-04-01",32.5727,14.9814,-0.381,1,-2.03,-0.232,-1.912,0.73,1.488],["2023-05-01",32.132,14.7787,-0.369,1,-1.496,0.614,-1.696,0.249,1.258],["2023-06-01",31.4265,14.4543,-0.404,1,-1.896,0.056,-2.031,0.331,1.113],["2023-07-01",32.1811,14.8013,-0.453,1,-1.976,0.695,-2.424,-0.552,1.009],["2023-08-01",31.7594,14.6073,-0.468,1,-1.999,0.996,-2.042,0.002,0.737],["2023-09-01",30.2689,13.9218,-0.42,1,-1.349,1.094,-1.732,-0.061,0.46],["2023-10-01",32.4805,14.939,-0.411,1,-1.275,1.162,-1.665,-0.456,0.54],["2023-11-01",33.3361,15.3326,-0.407,1,-1.642,0.991,-1.604,0.66,0.648],["2023-12-01",33.775,15.5344,-0.361,1,-0.884,0.674,-1.391,0.096,0.468],["2024-01-01",33.3851,15.3551,-0.275,1,0.113,0.627,-1.076,-0.595,0.244],["2024-02-01",33.4692,15.3937,-0.255,1,-0.104,0.105,-1.102,-0.703,0.096],["2024-03-01",36.5607,16.8157,-0.262,1,-0.371,0.392,-0.948,-0.795,-0.06],["2024-04-01",37.4299,17.2154,-0.246,1,0.109,-0.013,-0.518,-0.703,-0.108],["2024-05-01",38.101,17.5241,-0.254,1,0.166,-0.398,-0.56,-0.33,-0.042],["2024-06-01",38.0931,17.5205,-0.238,1,-0.003,0.224,-0.345,-0.398,-0.041],["2024-07-01",40.0717,18.4305,-0.238,1,-0.415,-0.151,-0.107,-0.104,0.082],["2024-08-01",40.9857,18.8509,-0.181,1,-0.098,-0.048,-0.188,0.18,0.16],["2024-09-01",43.1352,19.8395,-0.115,1,-0.063,0.518,-0.422,0.176,0.004],["2024-10-01",44.924,20.6623,-0.06,1,-0.297,0.965,-0.464,0.381,-0.183],["2024-11-01",43.3916,19.9575,-0.02,1,-0.129,0.597,-0.283,0.123,-0.277],["2024-12-01",42.9645,19.761,-0.029,1,-0.026,-0.102,-0.201,-0.061,-0.433],["2025-01-01",45.8079,21.0688,-0.051,1,-0.086,-0.788,-0.209,0.211,-0.486],["2025-02-01",46.7935,21.5221,-0.074,1,-0.136,-0.456,-0.095,0.626,-0.622],["2025-03-01",51.1416,23.522,-0.069,1,0.035,-0.23,-0.169,1.202,-0.463],["2025-04-01",53.8338,24.7602,-0.028,1,-0.131,0.289,-0.396,1.908,-0.052],["2025-05-01",53.8591,24.7718,0.063,1,0.045,1.117,-0.376,1.865,0.115],["2025-06-01",54.0793,24.8731,0.146,1,-0.189,0.908,-0.328,1.605,-0.333],["2025-07-01",53.8659,24.775,0.272,1,0.195,1.375,-0.155,1.512,-0.511],["2025-08-01",56.4415,25.9596,0.331,1,0.087,0.716,-0.13,1.061,-0.644],["2025-09-01",63.1706,29.0546,0.368,1,0.183,0.728,0.03,1.238,-0.697],["2025-10-01",65.5341,30.1416,0.383,1,0.477,0.614,0.106,1.553,-0.679],["2025-11-01",69.0215,31.7456,0.353,1,0.413,0.765,0.005,1.268,-0.59],["2025-12-01",70.7699,32.5498,0.4,1,0.479,1.042,-0.092,2.232,-0.567],["2026-01-01",80.1483,36.8633,0.417,1,0.115,1.512,-0.158,2.188,-0.75],["2026-02-01",86.4199,39.7478,0.479,1,-0.031,1.634,-0.28,2.571,-0.922],["2026-03-01",76.4226,35.1497,0.542,1,-0.037,1.448,-0.21,2.724,-0.576]];
+
+/* ============================================================
+   Theme tokens for charts
+   ============================================================ */
+const CSS = getComputedStyle(document.documentElement);
+const get = (name) => CSS.getPropertyValue(name).trim();
+
+const COL = {
+  text:    get('--text'),         // brighter than --text-dim
+  textDim: get('--text-dim'),
+  grid:    'rgba(201, 164, 114, 0.12)',  // brass-tinged, slightly brighter
+  strat:   get('--chart-strat'),
+  gold:    get('--chart-gold'),
+  ind:     get('--chart-ind'),
+  ry:      get('--drv-ry'),
+  dxy:     get('--drv-dxy'),
+  cpi:     get('--drv-cpi'),
+  gs:      get('--drv-gs'),
+  nfci:    get('--drv-nfci'),
+  thr:     get('--thr'),
+  long:    get('--band-long'),
+  cash:    get('--band-cash'),
+  s1:      get('--scen-1'),
+  s2:      get('--scen-2'),
+  s3:      get('--scen-3'),
+  brass:   get('--brass'),
+};
+
+Chart.defaults.font.family = '"JetBrains Mono", monospace';
+Chart.defaults.font.size = 10;
+Chart.defaults.color = COL.text;
+
+/* ============================================================
+   Selectors for period control (Tab 1)
+   ============================================================ */
+const startSel = document.getElementById('startSel');
+const endSel = document.getElementById('endSel');
+BT.forEach((row, i) => {
+  const d = moment(row[0]).format('MMM YYYY');
+  startSel.add(new Option(d, i));
+  endSel.add(new Option(d, i));
+});
+startSel.value = 0;
+endSel.value = BT.length - 1;
+
+/* ============================================================
+   Reusable: build position bands
+   ============================================================ */
+function bands(slice, posCol, yMax, yMin, posVal) {
+  const top = slice.map(r => ({x: r[0], y: r[posCol] === posVal ? yMax : null}));
+  const bot = slice.map(r => ({x: r[0], y: r[posCol] === posVal ? yMin : null}));
+  return [top, bot];
+}
+
+function bandDataset(label, data, color) {
+  return {
+    label, data, type: 'bar', yAxisID: 'y',
+    backgroundColor: color, borderWidth: 0,
+    barPercentage: 1.0, categoryPercentage: 1.0, order: 20,
+  };
+}
+
+function rebaseAndStats(startIdx, endIdx) {
+  const slice = BT.slice(startIdx, endIdx + 1);
+  if (slice.length < 2) return null;
+  const baseStrat = slice[0][1], baseGold = slice[0][2];
+  return {
+    portStrat: slice.map(r => ({x: r[0], y: r[1] / baseStrat})),
+    portGold:  slice.map(r => ({x: r[0], y: r[2] / baseGold})),
+    indicator: slice.map(r => ({x: r[0], y: r[3]})),
+    drvRY:   slice.map(r => ({x: r[0], y: r[5]})),
+    drvDXY:  slice.map(r => ({x: r[0], y: r[6]})),
+    drvCPI:  slice.map(r => ({x: r[0], y: r[7]})),
+    drvGS:   slice.map(r => ({x: r[0], y: r[8]})),
+    drvNFCI: slice.map(r => ({x: r[0], y: r[9]})),
+    slice, posCol: 4,
+  };
+}
+
+let eqChart, indChart, drvRYChart, drvDXYChart, drvCPIChart, drvGSChart, drvNFCIChart;
+
+/* ============================================================
+   Driver chart factory (Tab 1 mini-charts)
+   ============================================================ */
+function makeDriverChart(canvasId, color, label, data, slice, posCol) {
+  const vals = data.map(p => p.y).filter(v => v != null && !isNaN(v));
+  const dMin = vals.length ? Math.min(...vals) : -3;
+  const dMax = vals.length ? Math.max(...vals) : 3;
+  const yMin = Math.min(-1, Math.floor(dMin - 0.3));
+  const yMax = Math.max( 1, Math.ceil(dMax + 0.3));
+
+  const [longTop, longBot] = bands(slice, posCol, yMax * 2, yMin * 2, 1);
+  const [cashTop, cashBot] = bands(slice, posCol, yMax * 2, yMin * 2, 0);
+  const zero = slice.map(r => ({x: r[0], y: 0}));
+
+  return new Chart(document.getElementById(canvasId).getContext('2d'), {
+    data: { datasets: [
+      bandDataset('Long top',  longTop, COL.long),
+      bandDataset('Long bot',  longBot, COL.long),
+      bandDataset('Cash top',  cashTop, COL.cash),
+      bandDataset('Cash bot',  cashBot, COL.cash),
+      { label: 'Zero', data: zero, type: 'line', yAxisID: 'y',
+        borderColor: COL.thr, borderWidth: 1, borderDash: [2,3],
+        pointRadius: 0, fill: false, order: 10 },
+      { label, data, type: 'line', yAxisID: 'y',
+        borderColor: color, borderWidth: 1.4,
+        pointRadius: 0, pointHoverRadius: 4, tension: 0.15, fill: false, order: 1 },
+    ]},
+    options: chartOptions(yMin, yMax, label, true)
+  });
+}
+function updateDriverChart(chart, label, data, slice, posCol) {
+  const vals = data.map(p => p.y).filter(v => v != null && !isNaN(v));
+  const dMin = vals.length ? Math.min(...vals) : -3;
+  const dMax = vals.length ? Math.max(...vals) : 3;
+  const yMin = Math.min(-1, Math.floor(dMin - 0.3));
+  const yMax = Math.max( 1, Math.ceil(dMax + 0.3));
+  const [longTop, longBot] = bands(slice, 4, yMax * 2, yMin * 2, 1);
+  const [cashTop, cashBot] = bands(slice, 4, yMax * 2, yMin * 2, 0);
+  chart.data.datasets[0].data = longTop;
+  chart.data.datasets[1].data = longBot;
+  chart.data.datasets[2].data = cashTop;
+  chart.data.datasets[3].data = cashBot;
+  chart.data.datasets[4].data = slice.map(r => ({x: r[0], y: 0}));
+  chart.data.datasets[5].data = data;
+  chart.options.scales.y.min = yMin;
+  chart.options.scales.y.max = yMax;
+  chart.update();
+}
+function chartOptions(yMin, yMax, label, smallTitle) {
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(20, 16, 14, 0.92)',
+        titleColor: '#e8dcc4', bodyColor: '#b08d57',
+        borderColor: '#b08d57', borderWidth: 1,
+        padding: 10, displayColors: false,
+        titleFont: { family: '"Fraunces", serif', size: 12, style: 'italic', weight: 500 },
+        bodyFont: { family: '"JetBrains Mono", monospace', size: 11 },
+        filter: (item) => item.dataset.label === label,
+        callbacks: {
+          title: (items) => moment(items[0].parsed.x).format('MMM YYYY'),
+          label: (item) => `${label} · ${(item.parsed.y >= 0 ? '+' : '')}${item.parsed.y.toFixed(2)}`,
+        }
+      }
+    },
+    scales: {
+      x: { type: 'time', time: { unit: 'year', displayFormats: { year: "'YY" } },
+           ticks: { color: COL.text, maxTicksLimit: 10 },
+           grid: { color: COL.grid, drawOnChartArea: false } },
+      y: { type: 'linear', position: 'left', min: yMin, max: yMax,
+           ticks: { color: COL.text, stepSize: 1 },
+           grid: { color: COL.grid } }
+    }
+  };
+}
+
+/* ============================================================
+   Tab 1 — main update
+   ============================================================ */
+function updateTab1() {
+  let s = parseInt(startSel.value), e = parseInt(endSel.value);
+  if (s >= e) { s = Math.max(0, e - 1); startSel.value = s; }
+  const d = rebaseAndStats(s, e);
+  if (!d) return;
+
+  // Equity scales
+  const all = [...d.portStrat, ...d.portGold].map(p => p.y).filter(v => v > 0);
+  const yMin = Math.max(0.05, Math.min(...all) * 0.85);
+  const yMax = Math.max(...all) * 1.15;
+
+  const [eqLT, eqLB] = bands(d.slice, d.posCol, yMax * 5, yMin / 5, 1);
+  const [eqCT, eqCB] = bands(d.slice, d.posCol, yMax * 5, yMin / 5, 0);
+
+  // Indicator chart
+  const [iLT, iLB] = bands(d.slice, d.posCol, 3, -3, 1);
+  const [iCT, iCB] = bands(d.slice, d.posCol, 3, -3, 0);
+  const thrPos = d.slice.map(r => ({x: r[0], y: 0.5}));
+  const thrNeg = d.slice.map(r => ({x: r[0], y: -0.5}));
+
+  if (indChart) {
+    indChart.data.datasets[0].data = iLT;
+    indChart.data.datasets[1].data = iLB;
+    indChart.data.datasets[2].data = iCT;
+    indChart.data.datasets[3].data = iCB;
+    indChart.data.datasets[4].data = thrPos;
+    indChart.data.datasets[5].data = thrNeg;
+    indChart.data.datasets[6].data = d.indicator;
+    indChart.update();
+  } else {
+    indChart = new Chart(document.getElementById('indChart').getContext('2d'), {
+      data: { datasets: [
+        bandDataset('LongT', iLT, COL.long),
+        bandDataset('LongB', iLB, COL.long),
+        bandDataset('CashT', iCT, COL.cash),
+        bandDataset('CashB', iCB, COL.cash),
+        { label: '+0.5', data: thrPos, type: 'line', yAxisID: 'y',
+          borderColor: COL.thr, borderWidth: 1.2, borderDash: [3,4],
+          pointRadius: 0, fill: false, order: 5 },
+        { label: '-0.5', data: thrNeg, type: 'line', yAxisID: 'y',
+          borderColor: COL.thr, borderWidth: 1.2, borderDash: [3,4],
+          pointRadius: 0, fill: false, order: 5 },
+        { label: 'Indicator', data: d.indicator, type: 'line', yAxisID: 'y',
+          borderColor: COL.ind, borderWidth: 1.6,
+          pointRadius: 0, pointHoverRadius: 4, tension: 0.2, order: 1 }
+      ]},
+      options: chartOptions(-3, 3, 'Indicator', false)
+    });
+  }
+
+  // Equity chart
+  if (eqChart) {
+    eqChart.data.datasets[0].data = eqLT;
+    eqChart.data.datasets[1].data = eqLB;
+    eqChart.data.datasets[2].data = eqCT;
+    eqChart.data.datasets[3].data = eqCB;
+    eqChart.data.datasets[4].data = d.portStrat;
+    eqChart.data.datasets[5].data = d.portGold;
+    eqChart.options.scales.y.min = yMin;
+    eqChart.options.scales.y.max = yMax;
+    eqChart.update();
+  } else {
+    eqChart = new Chart(document.getElementById('eqChart').getContext('2d'), {
+      data: { datasets: [
+        bandDataset('LongT', eqLT, COL.long),
+        bandDataset('LongB', eqLB, COL.long),
+        bandDataset('CashT', eqCT, COL.cash),
+        bandDataset('CashB', eqCB, COL.cash),
+        { label: 'Strategy', data: d.portStrat, type: 'line', yAxisID: 'y',
+          borderColor: COL.strat, borderWidth: 1.8,
+          pointRadius: 0, pointHoverRadius: 4, tension: 0.1, order: 1 },
+        { label: 'Gold B&H', data: d.portGold, type: 'line', yAxisID: 'y',
+          borderColor: COL.gold, borderWidth: 1.5, borderDash: [4,3],
+          pointRadius: 0, pointHoverRadius: 4, tension: 0.1, order: 2 },
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(20, 16, 14, 0.92)',
+            titleColor: '#e8dcc4', bodyColor: '#b08d57',
+            borderColor: '#b08d57', borderWidth: 1, padding: 10, displayColors: false,
+            titleFont: { family: '"Fraunces", serif', size: 12, style: 'italic', weight: 500 },
+            bodyFont: { family: '"JetBrains Mono", monospace', size: 11 },
+            filter: (item) => ['Strategy', 'Gold B&H'].includes(item.dataset.label),
+            callbacks: {
+              title: (items) => moment(items[0].parsed.x).format('MMM YYYY'),
+              label: (item) => `${item.dataset.label} · $${item.parsed.y.toFixed(2)}`,
+            }
+          }
+        },
+        scales: {
+          x: { type: 'time', time: { unit: 'year', displayFormats: { year: "'YY" } },
+               ticks: { color: COL.text, maxTicksLimit: 14 },
+               grid: { color: COL.grid, drawOnChartArea: false } },
+          y: { type: 'logarithmic', position: 'left', min: yMin, max: yMax,
+               ticks: { color: COL.text, callback: (v) => '$' + v.toFixed(2) },
+               grid: { color: COL.grid } }
+        }
+      }
+    });
+  }
+
+  // Drivers
+  if (drvRYChart) {
+    updateDriverChart(drvRYChart,   'Real yield Δ6M', d.drvRY,   d.slice, d.posCol);
+    updateDriverChart(drvDXYChart,  'DXY Δ12M',       d.drvDXY,  d.slice, d.posCol);
+    updateDriverChart(drvCPIChart,  'CPI YoY Δ12M',   d.drvCPI,  d.slice, d.posCol);
+    updateDriverChart(drvGSChart,   'Gold/SPX Δ12M',  d.drvGS,   d.slice, d.posCol);
+    updateDriverChart(drvNFCIChart, 'NFCI level',     d.drvNFCI, d.slice, d.posCol);
+  } else {
+    drvRYChart   = makeDriverChart('drvRYChart',   COL.ry,   'Real yield Δ6M', d.drvRY,   d.slice, d.posCol);
+    drvDXYChart  = makeDriverChart('drvDXYChart',  COL.dxy,  'DXY Δ12M',       d.drvDXY,  d.slice, d.posCol);
+    drvCPIChart  = makeDriverChart('drvCPIChart',  COL.cpi,  'CPI YoY Δ12M',   d.drvCPI,  d.slice, d.posCol);
+    drvGSChart   = makeDriverChart('drvGSChart',   COL.gs,   'Gold/SPX Δ12M',  d.drvGS,   d.slice, d.posCol);
+    drvNFCIChart = makeDriverChart('drvNFCIChart', COL.nfci, 'NFCI level',     d.drvNFCI, d.slice, d.posCol);
+  }
+}
+
+function setPreset(years) {
+  if (years === 'all') { startSel.value = 0; endSel.value = BT.length - 1; }
+  else {
+    const monthsBack = years * 12;
+    const endIdx = BT.length - 1;
+    startSel.value = Math.max(0, endIdx - monthsBack);
+    endSel.value = endIdx;
+  }
+  updateTab1();
+}
+startSel.addEventListener('change', updateTab1);
+endSel.addEventListener('change', updateTab1);
+updateTab1();
+
+/* ============================================================
+   Tab 2 — period-controlled charts with mock data
+   ============================================================ */
+function makeMockSeries(start, end, base, vol, trend) {
+  const data = [];
+  let v = base;
+  const months = moment(end).diff(moment(start), 'months');
+  for (let i = 0; i <= months; i++) {
+    const x = moment(start).add(i, 'months').format('YYYY-MM-DD');
+    v += (Math.random() - 0.5) * vol + trend;
+    data.push({x, y: v});
+  }
+  return data;
+}
+
+// Pre-generate full-history mock series for each chart
+const MOCK_SERIES = {
+  nominal10y:  makeMockSeries('2003-01-01', '2026-03-01', 4.2, 0.18, -0.003),
+  tips10y:     makeMockSeries('2003-01-01', '2026-03-01', 2.0, 0.18, -0.003),
+  bei5y5y:     makeMockSeries('2003-01-01', '2026-03-01', 2.4, 0.10,  0.000),
+  termPrem:    makeMockSeries('1990-01-01', '2026-03-01', 1.6, 0.18, -0.003),  // 1990 onwards (ACM goes to 1961 but trim for readability)
+  goldUsd:     makeMockSeries('2010-01-01', '2026-03-01', 1200, 80, 18),
+  dxyInv:      makeMockSeries('2010-01-01', '2026-03-01', 95, 1.5, -0.05),
+  stressComp:  makeMockSeries('1995-01-01', '2026-03-01', 0, 0.3, 0),
+};
+
+// Build start/end selectors for Tab 2 — uses union of all series date ranges
+const t2StartSel = document.getElementById('t2StartSel');
+const t2EndSel = document.getElementById('t2EndSel');
+
+// Generate monthly options from earliest to latest across all mock series
+const t2EarliestDate = '1990-01-01';
+const t2LatestDate = '2026-03-01';
+const t2DateOpts = [];
+{
+  let d = moment(t2EarliestDate);
+  const end = moment(t2LatestDate);
+  while (d.isSameOrBefore(end)) {
+    t2DateOpts.push(d.format('YYYY-MM-DD'));
+    d.add(1, 'month');
+  }
+}
+t2DateOpts.forEach((dateStr, i) => {
+  const label = moment(dateStr).format('MMM YYYY');
+  t2StartSel.add(new Option(label, dateStr));
+  t2EndSel.add(new Option(label, dateStr));
+});
+t2StartSel.value = t2EarliestDate;
+t2EndSel.value = t2LatestDate;
+
+function filterByDate(series, fromStr, toStr) {
+  const from = moment(fromStr);
+  const to = moment(toStr);
+  return series.filter(p => {
+    const m = moment(p.x);
+    return m.isSameOrAfter(from) && m.isSameOrBefore(to);
+  });
+}
+
+const t2BaseOpts = {
+  responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(20, 16, 14, 0.94)',
+      titleColor: COL.text, bodyColor: COL.brass,
+      borderColor: COL.brass, borderWidth: 1, padding: 10, displayColors: true,
+      titleFont: { family: '"Fraunces", serif', size: 12, style: 'italic', weight: 500 },
+      bodyFont: { family: '"JetBrains Mono", monospace', size: 11 },
+    }
+  },
+  scales: {
+    x: { type: 'time', time: { unit: 'year', displayFormats: { year: "'YY" } },
+         ticks: { color: COL.text, maxTicksLimit: 12 },
+         grid: { color: COL.grid, drawOnChartArea: false } },
+    y: { ticks: { color: COL.text }, grid: { color: COL.grid } }
+  }
+};
+
+// Real rate chart (3-line: 10Y nominal, TIPS, 5y5y BEI)
+const realRateChart = new Chart(document.getElementById('realRateChart').getContext('2d'), {
+  type: 'line',
+  data: { datasets: [
+    { label: '10Y Nominal',    data: MOCK_SERIES.nominal10y,
+      borderColor: COL.gold, borderWidth: 1.6, pointRadius: 0, tension: 0.2 },
+    { label: '10Y TIPS (real)', data: MOCK_SERIES.tips10y,
+      borderColor: COL.strat, borderWidth: 1.6, pointRadius: 0, tension: 0.2 },
+    { label: '5y5y BEI',       data: MOCK_SERIES.bei5y5y,
+      borderColor: COL.cpi, borderWidth: 1.4, borderDash: [4,3], pointRadius: 0, tension: 0.2 },
+  ]},
+  options: t2BaseOpts
+});
+
+// Term premium chart with stress-zone fill and zero line
+const termPremChart = new Chart(document.getElementById('termPremChart').getContext('2d'), {
+  type: 'line',
+  data: { datasets: [
+    { label: 'Term premium', data: MOCK_SERIES.termPrem,
+      borderColor: COL.ry, borderWidth: 1.6, pointRadius: 0, tension: 0.2,
+      backgroundColor: 'rgba(208, 119, 78, 0.08)', fill: 'origin' },
+    { label: 'Zero', data: MOCK_SERIES.termPrem.map(p => ({x: p.x, y: 0})),
+      borderColor: COL.thr, borderWidth: 1, borderDash: [3,4], pointRadius: 0, fill: false },
+  ]},
+  options: t2BaseOpts
+});
+
+// Gold + DXY divergence
+const goldDxyChart = new Chart(document.getElementById('goldDxyChart').getContext('2d'), {
+  type: 'line',
+  data: { datasets: [
+    { label: 'Gold (USD/oz)', yAxisID: 'y',  data: MOCK_SERIES.goldUsd,
+      borderColor: COL.gold, borderWidth: 1.6, pointRadius: 0, tension: 0.2 },
+    { label: 'DXY (inverted)', yAxisID: 'y2', data: MOCK_SERIES.dxyInv,
+      borderColor: COL.dxy, borderWidth: 1.4, borderDash: [4,3], pointRadius: 0, tension: 0.2 },
+  ]},
+  options: { ...t2BaseOpts, scales: {
+    x: t2BaseOpts.scales.x,
+    y:  { position: 'left',  ticks: { color: COL.text }, grid: { color: COL.grid },
+          title: { display: true, text: 'Gold (USD/oz)', color: COL.textDim, font: { size: 10, family: '"JetBrains Mono", monospace' } } },
+    y2: { position: 'right', ticks: { color: COL.text }, grid: { display: false }, reverse: true,
+          title: { display: true, text: 'DXY (inverted)', color: COL.textDim, font: { size: 10, family: '"JetBrains Mono", monospace' } } }
+  }}
+});
+
+// Stress composite
+const stressChart = new Chart(document.getElementById('stressChart').getContext('2d'), {
+  type: 'line',
+  data: { datasets: [
+    { label: 'Stress', data: MOCK_SERIES.stressComp,
+      borderColor: COL.nfci, borderWidth: 1.5, pointRadius: 0, tension: 0.15,
+      backgroundColor: 'rgba(212, 120, 120, 0.08)', fill: 'origin' },
+    { label: 'Zero', data: MOCK_SERIES.stressComp.map(p => ({x: p.x, y: 0})),
+      borderColor: COL.thr, borderWidth: 1, borderDash: [3,4], pointRadius: 0, fill: false },
+  ]},
+  options: t2BaseOpts
+});
+
+function updateTab2() {
+  const from = t2StartSel.value;
+  const to   = t2EndSel.value;
+  if (moment(from).isSameOrAfter(moment(to))) return;
+
+  realRateChart.data.datasets[0].data = filterByDate(MOCK_SERIES.nominal10y, from, to);
+  realRateChart.data.datasets[1].data = filterByDate(MOCK_SERIES.tips10y, from, to);
+  realRateChart.data.datasets[2].data = filterByDate(MOCK_SERIES.bei5y5y, from, to);
+  realRateChart.update();
+
+  const tpFiltered = filterByDate(MOCK_SERIES.termPrem, from, to);
+  termPremChart.data.datasets[0].data = tpFiltered;
+  termPremChart.data.datasets[1].data = tpFiltered.map(p => ({x: p.x, y: 0}));
+  termPremChart.update();
+
+  goldDxyChart.data.datasets[0].data = filterByDate(MOCK_SERIES.goldUsd, from, to);
+  goldDxyChart.data.datasets[1].data = filterByDate(MOCK_SERIES.dxyInv, from, to);
+  goldDxyChart.update();
+
+  const stressFiltered = filterByDate(MOCK_SERIES.stressComp, from, to);
+  stressChart.data.datasets[0].data = stressFiltered;
+  stressChart.data.datasets[1].data = stressFiltered.map(p => ({x: p.x, y: 0}));
+  stressChart.update();
+}
+
+function setT2Preset(years) {
+  if (years === 'all') {
+    t2StartSel.value = t2EarliestDate;
+    t2EndSel.value = t2LatestDate;
+  } else {
+    const endIdx = t2DateOpts.length - 1;
+    const startIdx = Math.max(0, endIdx - years * 12);
+    t2StartSel.value = t2DateOpts[startIdx];
+    t2EndSel.value   = t2DateOpts[endIdx];
+  }
+  updateTab2();
+}
+
+t2StartSel.addEventListener('change', updateTab2);
+t2EndSel.addEventListener('change', updateTab2);
+
+/* ============================================================
+   Tab 3 placeholder charts (mock data)
+   ============================================================ */
+// Stacked area for scenarios
+const dates = [];
+const s1d = [], s2d = [], s3d = [];
+for (let y = 2010; y <= 2026; y++) {
+  for (let m = 1; m <= 12; m++) {
+    if (y === 2026 && m > 3) break;
+    const d = `${y}-${String(m).padStart(2,'0')}-01`;
+    dates.push(d);
+    // mock: roughly converging to current 42/47/11
+    const trend = (y - 2010) / 16;
+    const a = Math.max(0.1, 0.5 - trend * 0.1 + (Math.random()-0.5) * 0.1);
+    const b = Math.max(0.1, 0.4 + trend * 0.1 + (Math.random()-0.5) * 0.1);
+    const c = Math.max(0.05, 1 - a - b);
+    const total = a + b + c;
+    s1d.push({x: d, y: a/total * 100});
+    s2d.push({x: d, y: b/total * 100});
+    s3d.push({x: d, y: c/total * 100});
+  }
+}
+
+new Chart(document.getElementById('scenStackChart').getContext('2d'), {
+  type: 'line',
+  data: { datasets: [
+    { label: 'P(S1)', data: s1d, borderColor: COL.s1, backgroundColor: 'rgba(184, 99, 62, 0.55)',
+      borderWidth: 1, pointRadius: 0, fill: 'origin', tension: 0.25, stack: 'stack1' },
+    { label: 'P(S2)', data: s2d, borderColor: COL.s2, backgroundColor: 'rgba(90, 133, 136, 0.55)',
+      borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.25, stack: 'stack1' },
+    { label: 'P(S3)', data: s3d, borderColor: COL.s3, backgroundColor: 'rgba(138, 53, 48, 0.55)',
+      borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.25, stack: 'stack1' },
+  ]},
+  options: { ...t2BaseOpts, scales: {
+    x: t2BaseOpts.scales.x,
+    y: { stacked: true, min: 0, max: 100, ticks: { color: COL.text, callback: v => v + '%' }, grid: { color: COL.grid } }
+  }}
+});
+
+// Bridge chart — scenario shading (background, full height) + gold model position (stepped line at top)
+{
+  const bridgeStart = '1990-01-01';
+  const bridgeEnd = BT[BT.length - 1][0];
+
+  const mockScenarioHistory = [];
+  let d = moment(bridgeStart);
+  while (d.format('YYYY-MM-DD') <= bridgeEnd) {
+    const yr = d.year(), mo = d.month() + 1;
+    let dominant;
+    if (yr <= 1999) dominant = 'S2';
+    else if (yr <= 2002) dominant = 'S1';
+    else if (yr <= 2007) dominant = 'S2';
+    else if ((yr === 2008 && mo >= 9) || yr === 2009) dominant = 'S3';
+    else if (yr <= 2014) dominant = 'S1';
+    else if (yr <= 2019) dominant = 'S2';
+    else if (yr === 2020 && mo >= 3 && mo <= 6) dominant = 'S3';
+    else if (yr <= 2022) dominant = 'S1';
+    else dominant = 'S2';
+    mockScenarioHistory.push({ x: d.format('YYYY-MM-DD'), scen: dominant });
+    d.add(1, 'month');
+  }
+
+  const btFrom = moment(bridgeStart);
+  const btSlice = BT.filter(r => moment(r[0]).isSameOrAfter(btFrom));
+
+  // Scenario bars at full height (will be background via order)
+  const s1Band = mockScenarioHistory.map(p => ({x: p.x, y: p.scen === 'S1' ? 1 : null}));
+  const s2Band = mockScenarioHistory.map(p => ({x: p.x, y: p.scen === 'S2' ? 1 : null}));
+  const s3Band = mockScenarioHistory.map(p => ({x: p.x, y: p.scen === 'S3' ? 1 : null}));
+
+  // Position as stepped line — sits on top of bars visually (line type renders over bars)
+  // Maps pos=1 -> y=0.95, pos=0 -> y=0.05, so the line traces high when long, low when cash
+  const positionLine = btSlice.map(r => ({x: r[0], y: r[4] === 1 ? 0.95 : 0.05}));
+
+  new Chart(document.getElementById('bridgeChart').getContext('2d'), {
+    data: { datasets: [
+      // Scenario shading at full height
+      { label: 'S1 · Inflation', data: s1Band, type: 'bar', yAxisID: 'y',
+        backgroundColor: 'rgba(212, 119, 78, 0.35)', borderWidth: 0,
+        barPercentage: 1.0, categoryPercentage: 1.0, order: 30 },
+      { label: 'S2 · Productivity', data: s2Band, type: 'bar', yAxisID: 'y',
+        backgroundColor: 'rgba(122, 170, 173, 0.30)', borderWidth: 0,
+        barPercentage: 1.0, categoryPercentage: 1.0, order: 30 },
+      { label: 'S3 · Tail risk', data: s3Band, type: 'bar', yAxisID: 'y',
+        backgroundColor: 'rgba(160, 69, 64, 0.50)', borderWidth: 0,
+        barPercentage: 1.0, categoryPercentage: 1.0, order: 30 },
+      // Position stepped line on top
+      { label: 'Gold model position', data: positionLine, type: 'line', yAxisID: 'y',
+        borderColor: COL.brass, borderWidth: 2.5,
+        pointRadius: 0, stepped: true, fill: false, order: 1 },
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(20, 16, 14, 0.94)',
+          titleColor: COL.text, bodyColor: COL.brass,
+          borderColor: COL.brass, borderWidth: 1, padding: 10,
+          titleFont: { family: '"Fraunces", serif', size: 12, style: 'italic', weight: 500 },
+          bodyFont: { family: '"JetBrains Mono", monospace', size: 11 },
+          filter: (item) => item.parsed.y !== null,
+          callbacks: {
+            title: (items) => moment(items[0].parsed.x).format('MMM YYYY'),
+            label: (item) => {
+              if (item.dataset.label === 'Gold model position') {
+                return `Position · ${item.parsed.y > 0.5 ? 'LONG' : 'CASH'}`;
+              }
+              return item.dataset.label;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'year', displayFormats: { year: "'YY" } },
+             ticks: { color: COL.text, maxTicksLimit: 14 },
+             grid: { color: COL.grid, drawOnChartArea: false } },
+        y: { min: 0, max: 1.0,
+             ticks: { color: COL.text,
+                      callback: (v) => {
+                        if (v > 0.9) return 'Long';
+                        if (v < 0.1) return 'Cash';
+                        return '';
+                      } },
+             grid: { display: false } }
+      }
+    }
+  });
+}
+
+</script>
+
+</body>
+</html>
